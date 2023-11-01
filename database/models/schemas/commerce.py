@@ -1,19 +1,21 @@
+import enum
 from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, Text, DECIMAL, Boolean, ForeignKey, Index, DateTime, Enum
 from sqlalchemy.orm import relationship
 
-from database.models.base import Base
+from .base import Base
+from database.conf import DEBUG
 
 
 class ItemsImages(Base):
 
     __tablename__ = 'items_images'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    item_id = Column(Integer, ForeignKey('images.id'), primary_key=True)
+    item_id = Column(Integer, ForeignKey('items.id'), primary_key=True)
     image_id = Column(Integer, ForeignKey('images.id'), primary_key=True)
 
 
@@ -21,7 +23,7 @@ class Items(Base):
 
     __tablename__ = 'items'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -29,49 +31,49 @@ class Items(Base):
     description = Column(Text, nullable=True)
     price = Column(DECIMAL, nullable=False)
     available = Column(Boolean, default=True)
-    brand_id = Column(Integer, ForeignKey('brand.id'))
+    brand_id = Column(Integer, ForeignKey('brands.id'))
 
-    images = relationship(secondary=ItemsImages, back_populates='items')
+    images = relationship('Images', secondary=ItemsImages, back_populates='items')
     items_meta = relationship('ItemMeta', back_populates='items')
     brands = relationship('Brand', back_populates='items')
 
 
-Index('idx_items_id', Items.c.id)
+Index('idx_items_id', Items.id)
 
 
 class Images(Base):
 
     __tablename__ = 'images'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     path = Column(String(255), nullable=False)
 
-    items = relationship(secondary=ItemsImages, back_populates='images')
+    items = relationship('Items', secondary=ItemsImages, back_populates='images')
 
 
-Index('idx_images_id', Images.c.id)
+Index('idx_images_id', Images.id)
 
 
 class ItemMeta(Base):
 
     __tablename__ = 'item_meta'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
     item_id = Column(Integer, primary_key=True)
 
-    items = relationship('Items', back_populates='item_meta', single_parent=True)
+    items = relationship('Items', back_populates='item_meta', uselist=False, single_parent=True)
 
 
 class Brands(Base):
 
     __tablename__ = 'brands'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -80,29 +82,29 @@ class Brands(Base):
     items = relationship('Items', back_populates='brands', uselist=False)
 
 
-Index('idx_brand_id', Brands.c.id)
+Index('idx_brand_id', Brands.id)
 
 
 class OrderItem(Base):
 
     __tablename__ = 'order_item'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    order_id = Column(Integer, ForeignKey('orders.id'))
-    item_id = Column(Integer, ForeignKey('items.id'))
+    order_id = Column(Integer, ForeignKey('orders.id'), primary_key=True)
+    item_id = Column(Integer, ForeignKey('items.id'), primary_key=True)
 
 
 class Orders(Base):
 
     __tablename__ = 'orders'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('auth.users.id'))
+    user_id = Column(Integer, ForeignKey('auth.users.id' if not DEBUG else 'users.id'))
     date_created = Column(DateTime, default=datetime.utcnow())
 
     users = relationship('Users', back_populates='orders')
@@ -113,10 +115,16 @@ class Deliveries(Base):
 
     __tablename__ = 'deliveries'
     __table_args__ = (
-        {'schema': 'commerce'},
+        {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    order_id = Column(Integer, ForeignKey('orders.id'))
-    status = Column(Enum)
+    class Statuses(enum.Enum):
+        in_stock = 'in_stock'
+        on_the_way = 'on_the_way'
+        delivered = 'delivered'
+
+    order_id = Column(Integer, ForeignKey('orders.id'), primary_key=True)
+    status = Column(Enum(Statuses), default=Statuses.in_stock)
+    track_code = Column(String(length=100))
 
     orders = relationship('Orders', back_populates='deliveries', single_parent=True)

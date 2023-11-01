@@ -2,7 +2,8 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, BigInteger, String, Index, DateTime, UniqueConstraint, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 
-from database.models.base import Base
+from .base import Base
+from database.conf import DEBUG
 
 
 class Users(Base):
@@ -10,7 +11,7 @@ class Users(Base):
     __tablename__ = 'users'
     __table_args__ = (
         UniqueConstraint('tg_id', name='uq_tg_id'),
-        {'schema': 'auth'},
+        {'schema': 'auth'} if not DEBUG else None,
 
     )
 
@@ -26,15 +27,15 @@ class Users(Base):
     orders = relationship('Orders', back_populates='users')
 
 
-Index('idx_users_id', Users.c.id)
+Index('idx_users_id', Users.id)
 
 
 class Addresses(Base):
 
     __tablename__ = 'addresses'
     __table_args__ = (
-        ForeignKeyConstraint(columns=['user_id'], refcolumns=['Users.id'], onupdate='CASCADE', ondelete='CASCADE'),
-        {'schema': 'auth'},
+        ForeignKeyConstraint(columns=['user_id'], refcolumns=['users.id'], onupdate='CASCADE', ondelete='CASCADE'),
+        {'schema': 'auth'} if not DEBUG else None,
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -52,11 +53,11 @@ class Credentials(Base):
 
     __tablename__ = 'credentials'
     __table_args__ = (
-        ForeignKeyConstraint(columns=['user_id'], refcolumns='Users.id', ondelete='CASCADE', onupdate='CASCADE'),
-        {'schema': 'auth'}
+        ForeignKeyConstraint(columns=['user_id'], refcolumns=['users.id'], ondelete='CASCADE', onupdate='CASCADE'),
+        {'schema': 'auth'} if not DEBUG else None,
     )
 
-    user_id = Column(Integer)
+    user_id = Column(Integer, primary_key=True)
     password_hash = Column(String(length=255))
     auth_hash = Column(String(length=255))
     last_seen = Column(BigInteger)
