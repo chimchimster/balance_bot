@@ -1,14 +1,18 @@
 import os
+import re
 import hashlib
 
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Column, Integer, BigInteger, String, Index, DateTime, UniqueConstraint, ForeignKeyConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, Index, DateTime, UniqueConstraint, ForeignKeyConstraint, \
+    select, insert
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 
 from .base import Base
 from database.conf import DEBUG
-from database.models.exceptions.models_exc import UserNotFound
+from database.models.exceptions.models_exc import UserNotFound, AddressNotFound, IncorrectInput
 
 
 class Users(Base):
@@ -37,27 +41,29 @@ class Users(Base):
             tg_id: int,
             first_name: str,
             last_name: str,
-            session,
-    ) -> Column[int]:
+            session: AsyncSession,
+    ) -> Optional[int]:
 
-        user = cls(tg_id=tg_id, first_name=first_name, last_name=last_name)
+        user = await session.execute(
+            insert(cls).values(tg_id=tg_id, first_name=first_name, last_name=last_name).returning(cls.id)
+        )
 
-        session.add(user)
+        user_id = user.scalar()
 
-        await session.commit()
-
-        return user.id
+        return user_id
 
     @classmethod
     async def update_user(
             cls,
             tg_id: int,
-            session,
+            session: AsyncSession,
             first_name: str = None,
             last_name: str = None,
     ) -> Column[int]:
 
-        user = await session.query(cls).filter_by(tg_id=tg_id).scalar_one_or_none()
+        user = await session.execute(select(cls).filter_by(tg_id=tg_id))
+
+        user = user.scalar_one_or_none()
 
         if not user:
             raise UserNotFound(f'Пользователь с идентификатором {tg_id} не существует!')
@@ -68,8 +74,6 @@ class Users(Base):
         if last_name:
             user.last_name = last_name
 
-        await session.commit()
-
         return user.id
 
     @classmethod
@@ -79,12 +83,14 @@ class Users(Base):
             session,
     ) -> Column[int]:
 
-        user = await session.query(cls).filter_by(tg_id=tg_id).scalar_one_or_none()
+        user = await session.execute(select(cls.id).filter_by(tg_id=tg_id))
 
-        if not user:
+        user = user.scalar_one_or_none()
+
+        if user is None:
             raise UserNotFound(f'Пользователь с идентификатором {tg_id} не существует!')
 
-        return user.id
+        return user
 
 
 Index('idx_users_id', Users.id)
@@ -108,6 +114,53 @@ class Addresses(Base):
 
     users = relationship('Users', back_populates='addresses')
 
+    @classmethod
+    async def set_address(
+            cls,
+            user_id: int,
+            country: str,
+            city: str,
+            street: str,
+            apartment: str,
+            phone: str,
+            session: AsyncSession,
+    ) -> int:
+
+        if not re.match(r'[A-Z]{2}', country):
+            raise IncorrectInput(f'Допускается длина поля country равной 2-м символам и может содержать только заглавные'
+                                 f' латинские буквы.')
+
+        if not re.match(r'\w{5,50}', city):
+            raise IncorrectInput(f'Допускается длина поля city от 5 до 50 символов.')
+
+        if not re.match(r'\w{5,255}', street):
+            raise IncorrectInput(f'Допускается длина поля street от 5 до 255 символов.')
+
+        if not re.match(r'(\w|\d){1, 10}', apartment):
+            raise IncorrectInput(f'Допускается длина поля apartment от 5 до 255 символов.')
+
+        if not re.match(r'^((\+\s*|\d{1,3})(\s*|\)\()\d{1,3}(\s*|\)\()\d{1,3}(\s*|\)\()\d{1,3})', phone):
+            # TODO: Нужно немного подумать над этой регуляркой, писал ее в конце рабочего дня
+            raise IncorrectInput(f'Допустимый формат телефона 7 777 777 77 77')
+
+        address_id = await session.execute(
+            insert(cls).values(
+                user_id=user_id,
+                country=country,
+                city=city,
+                street=street,
+                apartment=apartment,
+                phone=phone
+            ).returning(cls.id)
+        )
+
+        address_id = address_id.scalar_one_or_none()
+
+        if not address_id:
+            raise AddressNotFound(f'Адрес для пользователя {user_id} не был добавлен.')
+
+        return address_id
+
 
 class Credentials(Base):
 
@@ -130,17 +183,21 @@ class Credentials(Base):
             password,
             salt_length: int = 16,
             iterations: int = 100000,
-            hash_length: int = 64
+            hash_length: int = 64,
     ) -> None:
+
+        if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', password):
+            raise IncorrectInput('Допускается пароль длинною от 8 до 16 символов. Пароль может содержать латинские '
+                                 'буквы в верхнем и нижнем регистре, цифры, а также специальные символы.')
 
         salt = os.urandom(salt_length)
         self.salt = salt
 
-        salted_password = password + salt
+        salted_password = password.encode('utf-8') + salt
 
         key = hashlib.pbkdf2_hmac(
             'sha256',
-            salted_password.encode('utf-8'),
+            salted_password,
             iterations=iterations,
             salt=salt,
             dklen=hash_length,
@@ -157,9 +214,15 @@ class Credentials(Base):
             hash_length: int = 64
     ) -> bool:
 
+        if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', password):
+            raise IncorrectInput('Допускается пароль длинною от 8 до 16 символов. Пароль может содержать латинские '
+                                 'буквы в верхнем и нижнем регистре, цифры, а также специальные символы.')
+
+        salted_password = password.encode('utf-8') + self.salt
+
         key = hashlib.pbkdf2_hmac(
             'sha256',
-            password.encode('utf-8'),
+            salted_password,
             salt=self.salt,
             iterations=iterations,
             dklen=hash_length,

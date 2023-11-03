@@ -1,6 +1,7 @@
 import asyncio
 import unittest
 
+from sqlalchemy import select, insert
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 from database.models import *
@@ -8,42 +9,130 @@ from database.models import *
 
 class TestHandlers(unittest.IsolatedAsyncioTestCase):
 
-    def setUp(self):
+    async def asyncSetUp(self):
 
-        self.meta = Base()
+        self.loop = asyncio.new_event_loop()
 
-        self.engine = create_async_engine(
+        # Fixtures
+        self.user_first_name = 'chim'
+        self.user_last_name = 'chimster'
+        self.user_password = 'chimchimster'
+        self.user_tg_id = 1550
+
+        # Database mocks
+        self.meta = meta = Base()
+        self.engine = engine = create_async_engine(
             url='sqlite+aiosqlite:///:memory',
         )
+        self.async_session = AsyncSession(self.engine)
 
-        self.new_user_first_name = 'chim'
-        self.new_user_last_name = 'chimster'
-        self.new_user_password = 'chimchimster'
-        self.new_user_tg_id = 1550
+        async with engine.begin() as conn:
+            await conn.run_sync(meta.metadata.create_all, checkfirst=True)
 
-    async def init_models(self):
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
+    def test001_user_creation(self):
+        async def create_user():
 
-    async def test_user_registration(self):
+            user_id = await Users.create_user(
+                tg_id=self.user_tg_id,
+                first_name=self.user_first_name,
+                last_name=self.user_last_name,
+                session=self.async_session,
+            )
 
-        loop = asyncio.get_running_loop()
+            await self.async_session.commit()
 
-        async with AsyncSession(self.engine) as async_session:
-            async with async_session.begin():
+            return user_id
 
-                user_id = await Users.create_user(
-                    tg_id=self.new_user_tg_id,
-                    first_name=self.new_user_first_name,
-                    last_name=self.new_user_last_name,
-                    session=async_session,
-                )
-                self.assertNotEqual(user_id, None)
-                await async_session.commit()
+        u_id = self.loop.run_until_complete(create_user())
 
-    def tearDown(self):
+        self.assertNotEqual(u_id, None)
+
+    def test002_get_user_id(self):
+        async def get_user_id():
+
+            user_id = await Users.get_user_id(
+                self.user_tg_id,
+                self.async_session,
+            )
+
+            await self.async_session.commit()
+
+            return user_id
+
+        u_id = self.loop.run_until_complete(get_user_id())
+
+        self.assertNotEqual(u_id, None)
+
+    def test003_update_user(self):
+
+        async def update_user_first_name():
+
+            await Users.update_user(
+                self.user_tg_id,
+                self.async_session,
+                first_name='Johnny',
+            )
+
+            await self.async_session.commit()
+
+            updated_first_name = await self.async_session.execute(
+                select(Users.first_name).filter_by(tg_id=self.user_tg_id)
+            )
+            updated_first_name = updated_first_name.scalar_one_or_none()
+
+            self.assertEqual(first='Johnny', second=updated_first_name)
+
+        async def update_user_last_name():
+
+            await Users.update_user(
+                self.user_tg_id,
+                self.async_session,
+                last_name='The Monster',
+            )
+
+            await self.async_session.commit()
+
+            updated_last_name = await self.async_session.execute(
+                select(Users.last_name).filter_by(tg_id=self.user_tg_id)
+            )
+            updated_last_name = updated_last_name.scalar_one_or_none()
+
+            self.assertEqual(first='The Monster', second=updated_last_name)
+
+        self.loop.run_until_complete(update_user_first_name())
+        self.loop.run_until_complete(update_user_last_name())
+
+    def test004_set_user_credentials(self):
+
+        async def set_user_password():
+
+            user_id = await Users.get_user_id(tg_id=self.user_tg_id, session=self.async_session)
+
+            credentials = Credentials(user_id=user_id)
+
+            await credentials.set_password(self.user_password)
+
+            self.async_session.add(credentials)
+
+            passwords_matched = await credentials.check_password(self.user_password)
+
+            self.assertTrue(passwords_matched)
+
+        self.loop.run_until_complete(set_user_password())
+
+    def test999_tear_down_module(self):
+
+        self.async_session.close()
 
         import pathlib
+
         mem_mock_obj = pathlib.Path().glob('./:memory')
-        pathlib.Path(next(mem_mock_obj)).unlink()
+
+        mem_mock_obj_name = next(mem_mock_obj)
+        pathlib.Path(mem_mock_obj_name).unlink()
+
+
+if __name__ == '__main__':
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestHandlers)
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
