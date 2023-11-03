@@ -1,6 +1,5 @@
-from .auth import *
-from .commerce import *
-
+from .schemas.auth import *
+from .schemas.commerce import *
 
 __all__ = [
     'Users',
@@ -14,4 +13,5 @@ __all__ = [
     'OrderItem',
     'Orders',
     'Deliveries',
+    'Base'
 ]

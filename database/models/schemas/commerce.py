@@ -33,9 +33,9 @@ class Items(Base):
     available = Column(Boolean, default=True)
     brand_id = Column(Integer, ForeignKey('brands.id'))
 
-    images = relationship('Images', secondary=ItemsImages, back_populates='items')
-    items_meta = relationship('ItemMeta', back_populates='items')
-    brands = relationship('Brand', back_populates='items')
+    images = relationship('Images', secondary='items_images', back_populates='items')
+    item_meta = relationship('ItemMeta', back_populates='items')
+    brands = relationship('Brands', back_populates='items')
 
 
 Index('idx_items_id', Items.id)
@@ -51,7 +51,7 @@ class Images(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     path = Column(String(255), nullable=False)
 
-    items = relationship('Items', secondary=ItemsImages, back_populates='images')
+    items = relationship('Items', secondary='items_images', back_populates='images')
 
 
 Index('idx_images_id', Images.id)
@@ -64,7 +64,7 @@ class ItemMeta(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    item_id = Column(Integer, primary_key=True)
+    item_id = Column(Integer, ForeignKey('items.id'), primary_key=True)
 
     items = relationship('Items', back_populates='item_meta', uselist=False, single_parent=True)
 

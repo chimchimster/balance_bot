@@ -4,7 +4,7 @@ import unittest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from database.engine import engine
+from database.handlers.utils.engine import engine
 from database.models.schemas.base import Base
 
 
@@ -59,7 +59,6 @@ class TestMockDatabase(unittest.IsolatedAsyncioTestCase):
 
     async def test_user_creation(self):
 
-        import asyncio
         from sqlalchemy import insert
 
         async with self.engine.begin() as conn:

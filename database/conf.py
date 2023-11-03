@@ -5,16 +5,17 @@ from pydantic_settings import BaseSettings, DotEnvSettingsSource
 DEBUG = True
 
 
-class PostgresSettings(DotEnvSettingsSource):
+class EnvironmentsSettings(DotEnvSettingsSource):
     pass
 
 
-if DEBUG:
+if not DEBUG:
     env_file_path = Path().cwd().parent / '.env'
 else:
-    env_file_path = Path.cwd() / 'database' / '.env'
+    env_file_path = Path.cwd() / '.env'
 
-postgres_settings = PostgresSettings(
+
+environments_settings = EnvironmentsSettings(
     settings_cls=BaseSettings,
     env_file=env_file_path,
     env_file_encoding='utf-8',

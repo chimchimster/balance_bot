@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import create_session
 
-from engine import engine
+from database.handlers.utils.engine import engine
 
 
 PostgresAsyncSession = create_session(
