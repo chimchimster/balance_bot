@@ -16,7 +16,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         # Fixtures
         self.user_first_name = 'chim'
         self.user_last_name = 'chimster'
-        self.user_password = 'chimchimster'
+        self.user_password = 'chimchimster1'
         self.user_tg_id = 1550
 
         # Database mocks
