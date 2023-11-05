@@ -120,9 +120,45 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
 
         self.loop.run_until_complete(set_user_password())
 
-    def test999_tear_down_module(self):
+    def test006_set_user_hash(self):
+        async def set_user_hash():
 
-        self.async_session.close()
+            user_id = await Users.get_user_id(tg_id=self.user_tg_id, session=self.async_session)
+
+            credentials = Credentials(user_id=user_id)
+
+            await credentials.set_auth_hash()
+
+            self.async_session.add(credentials)
+
+            auth_hash = await self.async_session.execute(select(Credentials.auth_hash).filter_by(user_id=user_id))
+            auth_hash = auth_hash.scalar_one_or_none()
+
+            self.assertTrue(auth_hash)
+
+        self.loop.run_until_complete(set_user_hash())
+
+    def test005_set_user_address(self):
+
+        async def set_user_address():
+
+            user_id = await Users.get_user_id(tg_id=self.user_tg_id, session=self.async_session)
+
+            address = await Addresses.set_address(
+                user_id,
+                'KZ',
+                'Coruscant',
+                'Anakin Skywalker Street',
+                '104',
+                '+79087643331',
+                self.async_session,
+            )
+
+            self.assertEqual(type(address), int)
+
+        self.loop.run_until_complete(set_user_address())
+
+    def test999_tear_down_module(self):
 
         import pathlib
 

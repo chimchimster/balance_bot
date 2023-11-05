@@ -1,6 +1,7 @@
 import os
 import re
 import hashlib
+import time
 
 from datetime import datetime
 from typing import Optional
@@ -81,7 +82,7 @@ class Users(Base):
             cls,
             tg_id: int,
             session,
-    ) -> Column[int]:
+    ) -> int:
 
         user = await session.execute(select(cls.id).filter_by(tg_id=tg_id))
 
@@ -136,12 +137,13 @@ class Addresses(Base):
         if not re.match(r'\w{5,255}', street):
             raise IncorrectInput(f'Допускается длина поля street от 5 до 255 символов.')
 
-        if not re.match(r'(\w|\d){1, 10}', apartment):
-            raise IncorrectInput(f'Допускается длина поля apartment от 5 до 255 символов.')
+        if not re.match(r'[\w\d]{1,10}', apartment):
+            raise IncorrectInput(f'Допускается длина поля apartment от 1 до 10 символов.')
 
-        if not re.match(r'^((\+\s*|\d{1,3})(\s*|\)\()\d{1,3}(\s*|\)\()\d{1,3}(\s*|\)\()\d{1,3})', phone):
-            # TODO: Нужно немного подумать над этой регуляркой, писал ее в конце рабочего дня
-            raise IncorrectInput(f'Допустимый формат телефона 7 777 777 77 77')
+        if not re.match(r'^(\+7|8)\d{7,10}$', phone):
+            raise IncorrectInput(f'Допустимый формат телефона +79999999999.')
+
+        phone = ''.join(re.findall(r'\d', phone)[1:])
 
         address_id = await session.execute(
             insert(cls).values(
@@ -231,3 +233,11 @@ class Credentials(Base):
         hash_hex = key.hex()
 
         return self.password_hash == hash_hex
+
+    async def set_auth_hash(self):
+
+        user_hash = hashlib.sha256().hexdigest()
+        now = int(time.time())
+
+        self.auth_hash = user_hash
+        self.last_seen = now
