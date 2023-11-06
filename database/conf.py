@@ -9,7 +9,7 @@ class EnvironmentsSettings(DotEnvSettingsSource):
     pass
 
 
-if not DEBUG:
+if DEBUG:
     env_file_path = Path().cwd().parent / '.env'
 else:
     env_file_path = Path.cwd() / '.env'

@@ -143,7 +143,7 @@ class Addresses(Base):
         if not re.match(r'^(\+7|8)\d{7,10}$', phone):
             raise IncorrectInput(f'Допустимый формат телефона +79999999999.')
 
-        phone = ''.join(re.findall(r'\d', phone)[1:])
+        phone = ''.join(re.findall(r'\d', phone)).lstrip('+')
 
         address_id = await session.execute(
             insert(cls).values(
