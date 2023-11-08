@@ -15,8 +15,8 @@ class ItemsImages(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    item_id = Column(Integer, ForeignKey('items.id'), primary_key=True)
-    image_id = Column(Integer, ForeignKey('images.id'), primary_key=True)
+    item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
+    image_id = Column(Integer, ForeignKey('commerce.images.id'), primary_key=True)
 
 
 class Items(Base):
@@ -31,9 +31,9 @@ class Items(Base):
     description = Column(Text, nullable=True)
     price = Column(DECIMAL, nullable=False)
     available = Column(Boolean, default=True)
-    brand_id = Column(Integer, ForeignKey('brands.id'))
+    brand_id = Column(Integer, ForeignKey('commerce.brands.id'))
 
-    images = relationship('Images', secondary='items_images', back_populates='items')
+    images = relationship('Images', secondary='commerce.items_images', back_populates='items')
     item_meta = relationship('ItemMeta', back_populates='items')
     brands = relationship('Brands', back_populates='items')
 
@@ -51,7 +51,7 @@ class Images(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     path = Column(String(255), nullable=False)
 
-    items = relationship('Items', secondary='items_images', back_populates='images')
+    items = relationship('Items', secondary='commerce.items_images', back_populates='images')
 
 
 Index('idx_images_id', Images.id)
@@ -64,7 +64,7 @@ class ItemMeta(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    item_id = Column(Integer, ForeignKey('items.id'), primary_key=True)
+    item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
 
     items = relationship('Items', back_populates='item_meta', uselist=False, single_parent=True)
 
@@ -92,8 +92,8 @@ class OrderItem(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    order_id = Column(Integer, ForeignKey('orders.id'), primary_key=True)
-    item_id = Column(Integer, ForeignKey('items.id'), primary_key=True)
+    order_id = Column(Integer, ForeignKey('commerce.orders.id'), primary_key=True)
+    item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
 
 
 class Orders(Base):
@@ -123,8 +123,8 @@ class Deliveries(Base):
         on_the_way = 'on_the_way'
         delivered = 'delivered'
 
-    order_id = Column(Integer, ForeignKey('orders.id'), primary_key=True)
-    status = Column(Enum(Statuses), default=Statuses.in_stock)
+    order_id = Column(Integer, ForeignKey('commerce.orders.id'), primary_key=True)
+    status = Column(Enum(Statuses, schema='commerce'), default=Statuses.in_stock)
     track_code = Column(String(length=100))
 
     orders = relationship('Orders', back_populates='deliveries', single_parent=True)

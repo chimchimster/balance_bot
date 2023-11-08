@@ -101,7 +101,7 @@ class Addresses(Base):
 
     __tablename__ = 'addresses'
     __table_args__ = (
-        ForeignKeyConstraint(columns=['user_id'], refcolumns=['users.id'], onupdate='CASCADE', ondelete='CASCADE'),
+        ForeignKeyConstraint(columns=['user_id'], refcolumns=['auth.users.id'], onupdate='CASCADE', ondelete='CASCADE'),
         {'schema': 'auth'} if not DEBUG else None,
     )
 
@@ -168,7 +168,7 @@ class Credentials(Base):
 
     __tablename__ = 'credentials'
     __table_args__ = (
-        ForeignKeyConstraint(columns=['user_id'], refcolumns=['users.id'], ondelete='CASCADE', onupdate='CASCADE'),
+        ForeignKeyConstraint(columns=['user_id'], refcolumns=['auth.users.id'], ondelete='CASCADE', onupdate='CASCADE'),
         {'schema': 'auth'} if not DEBUG else None,
     )
 

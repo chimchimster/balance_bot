@@ -5,22 +5,52 @@ from unittest.mock import Mock
 
 import sqlalchemy.exc
 from aiogram.types import Message
+from sqlalchemy.schema import CreateSchema
+from sqlalchemy.sql.ddl import DropSchema
 
 from database.session import AsyncSessionLocal
 from database.models import *
 from database.engine import postgres_engine
 from database.handlers.utils.redis_client import connect_redis_url
 from middlewares.utils.state import check_auth_state
+from signals.signals import Signal
 
 
 class TestAuthState(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+
+        self.meta = Base()
+        self.lock = asyncio.Lock()
+        self.loop = asyncio.new_event_loop()
+
+        self.tg_user_id = 1234
+
+        async def create_schemas(lock):
+            async with lock:
+                async with AsyncSessionLocal() as session:
+                    async with session.begin() as transaction:
+                        try:
+                            await session.execute(CreateSchema('auth', if_not_exists=True))
+                            await session.execute(CreateSchema('commerce', if_not_exists=True))
+                            await transaction.commit()
+                        except sqlalchemy.exc.SQLAlchemyError as sql_err:
+                            logging.getLogger(__name__).error(str(sql_err))
+                            await transaction.rollback()
+                        except Exception as e:
+                            logging.getLogger(__name__).error(str(e))
+
+        async def create_tables(lock):
+            async with lock:
+                async with postgres_engine.engine.begin() as conn:
+                    await conn.run_sync(self.meta.metadata.create_all)
+
+        self.loop.run_until_complete(create_schemas(self.lock))
+        self.loop.run_until_complete(create_tables(self.lock))
+
     async def asyncSetUp(self):
 
         self.r_con = await connect_redis_url()
-        self.loop = asyncio.new_event_loop()
-
-        async with postgres_engine.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
 
     def test001_check_redis_connection(self):
         async def check_redis_connection():
@@ -30,24 +60,36 @@ class TestAuthState(unittest.IsolatedAsyncioTestCase):
 
     def test002_check_auth_state(self):
         message_1 = Mock()
-        message_1.text = 'Hello, world!'
-        message_1.from_user.id = 1234
+        message_1.from_user.id = self.tg_user_id
 
-        async def check_auth_state_1():
+        async def check_auth_state_registered(lock):
             nonlocal message_1
 
-            signal = await check_auth_state(message_1)
-            print(signal)
+            async with lock:
+                signal = await check_auth_state(message_1)
+                self.assertEqual(signal, Signal.NOT_REGISTERED)
 
-        self.loop.run_until_complete(check_auth_state_1())
+        self.loop.run_until_complete(check_auth_state_registered(self.lock))
 
-    def __del__(self):
+    def tearDown(self):
 
-        if not self.loop.is_running():
-            self.loop.close()
-        else:
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            self.loop.close()
+        async def drop_down_tables():
+            async with postgres_engine.engine.begin() as conn:
+                await conn.run_sync(self.meta.metadata.drop_all, checkfirst=True)
+
+        async def drop_schemas():
+            async with AsyncSessionLocal() as session:
+                async with session.begin() as transaction:
+                    try:
+                        await session.execute(DropSchema('auth'))
+                        await session.execute(DropSchema('commerce'))
+                        await transaction.commit()
+                    except sqlalchemy.exc.SQLAlchemyError as sql_err:
+                        logging.getLogger(__name__).error(str(sql_err))
+                        await transaction.rollback()
+
+        self.loop.run_until_complete(drop_down_tables())
+        self.loop.run_until_complete(drop_schemas())
 
 
 if __name__ == '__main__':
