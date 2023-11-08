@@ -34,7 +34,7 @@ async def check_auth_state(
                         credentials = Credentials(user_id=user_id)
                         await credentials.set_auth_hash()
 
-                        r_cli.hset(f'auth_hash:{user_id}', mapping={
+                        await r_cli.hset(f'auth_hash:{user_id}', mapping={
                             'hash': credentials.auth_hash,
                             'last_seen': credentials.last_seen,
                         })
@@ -43,6 +43,8 @@ async def check_auth_state(
                     except UserNotFound:
                         await transaction.rollback()
                         return Signal.NOT_REGISTERED
+                    else:
+                        return Signal.NOT_AUTHENTICATED
 
         except sqlalchemy.exc.SQLAlchemyError as sql_err:
             logging.getLogger(__name__).error(str(sql_err))
@@ -57,6 +59,7 @@ async def check_auth_state(
             return Signal.UNKNOWN_ERROR
 
         if now - last_seen > AUTH_PERIOD:
+
             return Signal.NOT_AUTHENTICATED
         else:
             return Signal.AUTHENTICATED

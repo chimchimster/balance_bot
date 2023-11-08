@@ -59,17 +59,42 @@ class TestAuthState(unittest.IsolatedAsyncioTestCase):
         self.loop.run_until_complete(check_redis_connection())
 
     def test002_check_auth_state(self):
-        message_1 = Mock()
-        message_1.from_user.id = self.tg_user_id
+        message = Mock()
+        message.from_user.id = self.tg_user_id
 
         async def check_auth_state_registered(lock):
-            nonlocal message_1
+            nonlocal message
 
             async with lock:
-                signal = await check_auth_state(message_1)
+                signal = await check_auth_state(message)
                 self.assertEqual(signal, Signal.NOT_REGISTERED)
 
+        async def check_auth_state_not_authenticated(lock):
+            nonlocal message
+
+            try:
+                async with lock:
+                    async with AsyncSessionLocal() as session:
+                        async with session.begin() as transaction:
+                            await Users.create_user(self.tg_user_id, 'Anakin', 'Skywalker', session)
+                            await transaction.commit()
+            except sqlalchemy.exc.SQLAlchemyError:
+                await transaction.rollback()
+
+            async with lock:
+                signal = await check_auth_state(message)
+                self.assertEqual(signal, Signal.NOT_AUTHENTICATED)
+
+        async def check_auth_state_authenticated(lock):
+            nonlocal message
+
+            async with lock:
+                signal = await check_auth_state(message)
+                self.assertEqual(signal, Signal.AUTHENTICATED)
+
         self.loop.run_until_complete(check_auth_state_registered(self.lock))
+        self.loop.run_until_complete(check_auth_state_not_authenticated(self.lock))
+        self.loop.run_until_complete(check_auth_state_authenticated(self.lock))
 
     def tearDown(self):
 
