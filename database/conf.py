@@ -2,18 +2,17 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, DotEnvSettingsSource
 
 
-DEBUG = True
+DEBUG = False
 
 
 class EnvironmentsSettings(DotEnvSettingsSource):
     pass
 
 
-if DEBUG:
-    env_file_path = Path().cwd().parent / '.env'
+if not DEBUG:
+    env_file_path = Path('/home/newuser/balance_tg/balance_bot/database/.env') # ABS
 else:
     env_file_path = Path.cwd() / '.env'
-
 
 environments_settings = EnvironmentsSettings(
     settings_cls=BaseSettings,
