@@ -15,7 +15,7 @@ class AuthUserMiddleware(BaseMiddleware):
             data: Dict[str, Any]
     ):
 
-        auth_state = check_auth_state(event)
+        auth_state = await check_auth_state(event)
 
         if auth_state:
 
