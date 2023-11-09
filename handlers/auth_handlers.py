@@ -9,4 +9,4 @@ router = Router()
 @router.message(CommandStart)
 async def cmd_start_handler(message: Message, state: FSMContext):
 
-    return message.reply('Hello, world!')
+    return message.answer('Hello, world!')

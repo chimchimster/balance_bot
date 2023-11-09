@@ -1,8 +1,11 @@
+import asyncio
+import sys
 import logging
-from typing import Dict, Optional
 
-from fastapi import FastAPI, Depends
-from aiogram import Bot, Dispatcher, types
+from aiogram.enums import ParseMode
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 
 from conf import bot_settings
@@ -13,36 +16,47 @@ from handlers.auth_handlers import router as auth_router
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = bot_settings.bot_token.get_secret_value()
-WEBHOOK_PATH = f'/bot/{BOT_TOKEN}'
-WEBHOOK_URL = f'https://{bot_settings.server_token.get_secret_value()}' + '.onrender.com' + WEBHOOK_PATH
-
-bot = Bot(token=BOT_TOKEN)
-app = FastAPI()
+WEBHOOK_URL = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={bot_settings.server_token.get_secret_value()}'
 
 
-async def get_dispatcher(_bot: Bot = Depends(), _storage: RedisStorage = Depends()):
-    return Dispatcher(bot=_bot, storage=_storage).include_routers(auth_router)
+async def on_startup(bot: Bot) -> None:
+
+    await bot.set_webhook(WEBHOOK_URL)
 
 
-@app.on_event('startup')
-async def on_startup(dispatcher: Dispatcher = Depends()):
+def main() -> None:
 
-    redis_connection = await connect_redis_url()
+    async def get_redis_connection():
+        return await connect_redis_url()
 
-    storage = RedisStorage(redis_connection)
-    dispatcher.storage = storage
+    loop = asyncio.new_event_loop()
 
-    webhook_info = await bot.get_webhook_info()
-    if webhook_info.url != WEBHOOK_URL:
-        await bot.set_webhook(url=WEBHOOK_URL)
+    r_con = loop.run_until_complete(get_redis_connection())
+
+    dp = Dispatcher(storage=RedisStorage(r_con))
+
+    loop.close()
+
+    dp.include_router(auth_router)
+
+    dp.startup.register(on_startup)
+
+    bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+
+    app = web.Application()
+
+    webhook_requests_handler = SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+    )
+
+    webhook_requests_handler.register(app, path='')
+
+    setup_application(app, dp, bot=bot)
+    web.run_app(app, host='0.0.0.0', port=8000)
 
 
-@app.post(WEBHOOK_PATH)
-async def bot_webhook(update: Dict, dispatcher: Dispatcher = Depends(), _bot: Bot = Depends()):
-    telegram_update = types.Update(**update)
-    await dispatcher.feed_update(_bot, telegram_update)
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    main()
 
-
-@app.on_event('shutdown')
-async def on_shutdown(_bot: Bot = Depends()):
-    await _bot.session.close()
