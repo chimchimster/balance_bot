@@ -1,10 +1,12 @@
 import asyncio
+import functools
 import logging
+import time
 import unittest
-from unittest.mock import Mock
+from typing import Final
+from unittest.mock import Mock, patch
 
 import sqlalchemy.exc
-from aiogram.types import Message
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy.sql.ddl import DropSchema
 
@@ -76,7 +78,9 @@ class TestAuthState(unittest.IsolatedAsyncioTestCase):
                 async with lock:
                     async with AsyncSessionLocal() as session:
                         async with session.begin() as transaction:
-                            await Users.create_user(self.tg_user_id, 'Anakin', 'Skywalker', session)
+                            user_id = await Users.create_user(self.tg_user_id, 'Anakin', 'Skywalker', session)
+                            credentials = Credentials(user_id=user_id)
+                            await credentials.set_auth_hash()
                             await transaction.commit()
             except sqlalchemy.exc.SQLAlchemyError:
                 await transaction.rollback()
@@ -92,9 +96,18 @@ class TestAuthState(unittest.IsolatedAsyncioTestCase):
                 signal = await check_auth_state(message)
                 self.assertEqual(signal, Signal.AUTHENTICATED)
 
+        async def check_auth_state_registered_but_not_authenticated(lock):
+            nonlocal message
+
+            async with lock:
+                with patch('middlewares.utils.state.AUTH_PERIOD', new=-1):
+                    signal = await check_auth_state(message)
+                    self.assertEqual(signal, Signal.NOT_AUTHENTICATED)
+
         self.loop.run_until_complete(check_auth_state_registered(self.lock))
         self.loop.run_until_complete(check_auth_state_not_authenticated(self.lock))
         self.loop.run_until_complete(check_auth_state_authenticated(self.lock))
+        self.loop.run_until_complete(check_auth_state_registered_but_not_authenticated(self.lock))
 
     def tearDown(self):
 
@@ -115,6 +128,7 @@ class TestAuthState(unittest.IsolatedAsyncioTestCase):
 
         self.loop.run_until_complete(drop_down_tables())
         self.loop.run_until_complete(drop_schemas())
+        self.loop.run_until_complete(self.r_con.flushall())
 
 
 if __name__ == '__main__':

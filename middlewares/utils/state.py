@@ -34,7 +34,7 @@ async def check_auth_state(
                         credentials = Credentials(user_id=user_id)
                         await credentials.set_auth_hash()
 
-                        await r_cli.hset(f'auth_hash:{user_id}', mapping={
+                        await r_cli.hset(f'auth_hash:{tg_id}', mapping={
                             'hash': credentials.auth_hash,
                             'last_seen': credentials.last_seen,
                         })
@@ -54,20 +54,12 @@ async def check_auth_state(
         now = int(time.time())
 
         last_seen = await r_cli.hget(f'auth_hash:{tg_id}', 'last_seen')
+        last_seen = int(last_seen)
 
         if not last_seen:
             return Signal.UNKNOWN_ERROR
 
         if now - last_seen > AUTH_PERIOD:
-
             return Signal.NOT_AUTHENTICATED
         else:
             return Signal.AUTHENTICATED
-
-
-
-
-
-
-
-
