@@ -3,6 +3,8 @@ from typing import Callable, Awaitable, Dict, Any
 from aiogram import BaseMiddleware
 from aiogram.types import Message
 
+from middlewares.utils.state import check_auth_state
+
 
 class AuthUserMiddleware(BaseMiddleware):
 
@@ -13,4 +15,10 @@ class AuthUserMiddleware(BaseMiddleware):
             data: Dict[str, Any]
     ):
 
-        pass
+        auth_state = check_auth_state(event)
+
+        if auth_state:
+
+            data['auth_state'] = auth_state
+
+            return await handler(event, data)
