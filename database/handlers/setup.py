@@ -29,4 +29,3 @@ async def setup_database():
     except sqlalchemy.exc.ProgrammingError as prog_err:
         logging.getLogger(__name__).error(str(prog_err))
 
-

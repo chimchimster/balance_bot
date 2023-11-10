@@ -45,6 +45,12 @@ class Users(Base):
             session: AsyncSession,
     ) -> Optional[int]:
 
+        if not re.match(r'[А-Яа-яA-Za-z\s]{1,50}', first_name):
+            raise IncorrectInput('Имя пользователя должно содержать от 1 до 50 символов.')
+
+        if not re.match(r'[А-Яа-яA-Za-z\s]{1,50}', last_name):
+            raise IncorrectInput('Имя пользователя должно содержать от 1 до 50 символов.')
+
         user = await session.execute(
             insert(cls).values(tg_id=tg_id, first_name=first_name, last_name=last_name).returning(cls.id)
         )
@@ -68,6 +74,12 @@ class Users(Base):
 
         if not user:
             raise UserNotFound(f'Пользователь с идентификатором {tg_id} не существует!')
+
+        if not re.match(r'[А-Яа-яA-Za-z\s]{1,50}', first_name):
+            raise IncorrectInput('Имя пользователя должно содержать от 1 до 50 символов.')
+
+        if not re.match(r'[А-Яа-яA-Za-z\s]{1,50}', last_name):
+            raise IncorrectInput('Имя пользователя должно содержать от 1 до 50 символов.')
 
         if first_name:
             user.first_name = first_name

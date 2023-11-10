@@ -18,16 +18,16 @@ BOT_TOKEN = bot_settings.bot_token.get_secret_value()
 SERVER_URL = bot_settings.server_token.get_secret_value()
 WEBHOOK_URL = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={SERVER_URL}'
 
+bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+
 
 async def on_startup(bot: Bot) -> None:
-
     await setup_database()
 
     await bot.set_webhook(WEBHOOK_URL)
 
 
 def main() -> None:
-
     loop = asyncio.new_event_loop()
     r_con = loop.run_until_complete(connect_redis_url())
     loop.close()
@@ -36,8 +36,6 @@ def main() -> None:
     dp.message.outer_middleware(AuthUserMiddleware())
     dp.include_router(auth_router)
     dp.startup.register(on_startup)
-
-    bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
 
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,

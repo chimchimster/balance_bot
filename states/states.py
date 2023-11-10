@@ -1,8 +1,15 @@
 from aiogram.fsm.state import State, StatesGroup
 
 
-class AuthState(StatesGroup):
-    AUTHENTICATED = State()
-    NOT_AUTHENTICATED = State()
-    NOT_REGISTERED = State()
+class InitialState(StatesGroup):
+    TO_REGISTRATION = State()
+    TO_AUTHENTICATION = State()
+    TO_APPLICATION = State()
 
+
+class RegState(StatesGroup):
+    INPUT_FIRST_NAME = State()
+    INPUT_LAST_NAME = State()
+    INPUT_PASSWORD = State()
+    INPUT_PASSWORD_CONFIRMATION = State()
+    CONFIRM_REGISTRATION = State()
