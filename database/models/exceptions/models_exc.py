@@ -8,3 +8,10 @@ class IncorrectInput(Exception):
 
 class AddressNotFound(Exception):
     pass
+
+
+__all__ = [
+    'UserNotFound',
+    'IncorrectInput',
+    'AddressNotFound',
+]

@@ -10,6 +10,7 @@ from sqlalchemy import Column, Integer, BigInteger, String, Index, DateTime, Uni
     select, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import BYTEA
 
 from .base import Base
 from database.conf import DEBUG
@@ -185,7 +186,7 @@ class Credentials(Base):
     )
 
     user_id = Column(Integer, primary_key=True)
-    salt = Column(String(length=255))
+    salt = Column(BYTEA)
     password_hash = Column(String(length=255))
     auth_hash = Column(String(length=255))
     last_seen = Column(BigInteger)

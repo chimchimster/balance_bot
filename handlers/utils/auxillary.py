@@ -4,8 +4,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 
-from states.states import RegState
-
 
 async def validate_user_registration(
         message: Message,
@@ -15,6 +13,7 @@ async def validate_user_registration(
         err_msg: str,
         regex_pattern: str,
         key_name: str,
+        end: bool = False,
 ) -> None:
 
     data = await state.get_data()
@@ -37,16 +36,25 @@ async def validate_user_registration(
     await state.set_state(state_to_set)
     await message.chat.delete_message(message_id=message.message_id)
 
-    last_bot_msg = await message.answer(f'<code>{info_msg}</code>')
+    if not end:
+        last_bot_msg = await message.answer(f'<code>{info_msg}</code>')
+    else:
+        button_yes = KeyboardButton(text='Да')
+        button_no = KeyboardButton(text='Нет')
+
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[[button_yes], [button_no]], resize_keyboard=True)
+
+        last_bot_msg = await message.answer(f'<code>{info_msg}</code>', reply_markup=keyboard)
 
     await state.update_data({'last_bot_msg_id': last_bot_msg.message_id})
 
-    curr_state = await state.get_state()
 
-    if curr_state == RegState.CONFIRM_REGISTRATION:
+async def password_matched(password: str, password_confirmation: str) -> bool:
 
-        button_yes = KeyboardButton(text='<code>Да</code>')
-        button_no = KeyboardButton(text='<code>Нет</code>')
-        keyboard = ReplyKeyboardMarkup(keyboard=[[button_yes, button_no]])
+    if not any([password, password_confirmation]):
+        return False
 
-        await message.answer('Подтвердить введенные данные?', reply_markup=keyboard)
+    if password != password_confirmation:
+        return False
+    return True
