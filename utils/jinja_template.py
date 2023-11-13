@@ -4,7 +4,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 template_env = Environment(loader=FileSystemLoader(
-    pathlib.Path.cwd() / 'templates',
+    pathlib.Path('/home/newuser/balance_tg/balance_bot/') / 'templates',
     ),
     autoescape=select_autoescape(['html']),
     enable_async=True,

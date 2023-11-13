@@ -21,8 +21,4 @@ async def get_registration_keyboard() -> InlineKeyboardMarkup:
     return keyboard
 
 
-async def get_authorization_keyboard():
-    pass
-
-
-__all__ = ['get_registration_keyboard', 'get_authorization_keyboard']
+__all__ = ['get_registration_keyboard',]

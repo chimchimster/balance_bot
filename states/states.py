@@ -13,3 +13,7 @@ class RegState(StatesGroup):
     INPUT_PASSWORD = State()
     INPUT_PASSWORD_CONFIRMATION = State()
     CONFIRM_REGISTRATION = State()
+
+
+class PersonalState(StatesGroup):
+    PERSONAL_INFO = State()

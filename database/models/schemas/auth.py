@@ -27,7 +27,7 @@ class Users(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tg_id = Column(Integer, nullable=False)
+    tg_id = Column(BigInteger, nullable=False)
     first_name = Column(String(length=50))
     last_name = Column(String(length=50))
     date_added = Column(DateTime, default=datetime.utcnow())

@@ -12,6 +12,7 @@ from conf import bot_settings
 from database.handlers.setup import setup_database
 from database.handlers.utils.redis_client import connect_redis_url
 from handlers.auth_handlers import router as auth_router
+from handlers.app_handlers import router as app_router
 from middlewares.auth import AuthUserMiddleware
 
 BOT_TOKEN = bot_settings.bot_token.get_secret_value()
@@ -34,7 +35,7 @@ def main() -> None:
 
     dp = Dispatcher(storage=RedisStorage(r_con))
     dp.message.outer_middleware(AuthUserMiddleware())
-    dp.include_router(auth_router)
+    dp.include_routers(auth_router, app_router)
     dp.startup.register(on_startup)
 
     webhook_requests_handler = SimpleRequestHandler(
