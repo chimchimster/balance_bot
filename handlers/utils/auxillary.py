@@ -26,6 +26,7 @@ async def validate_user_registration(
     msg_txt = message.text
 
     if not re.match(regex_pattern, msg_txt):
+
         last_bot_msg = await message.answer(f'<code>{err_msg}</code>')
 
         await state.update_data({'last_bot_msg_id': last_bot_msg.message_id})

@@ -1,6 +1,6 @@
 import re
 import time
-from typing import Union, Optional
+from typing import Optional
 
 import sqlalchemy.exc
 
@@ -18,6 +18,7 @@ from keyboards.inline.auth_keyboards import *
 from signals.signals import Signal
 from states.states import InitialState, RegState
 from handlers.utils.auxillary import validate_user_registration, password_matched
+from handlers.app_handlers import main_menu_handler
 
 
 router = Router()
@@ -29,28 +30,38 @@ async def cmd_start_handler(message: Message, state: FSMContext, **kwargs):
     auth_state = kwargs.pop('auth_state')
 
     if not auth_state:
-        return message.answer('Увы, что-то пошло не так...')
+        return message.answer('<code>Увы, что-то пошло не так...</code>')
 
     match auth_state:
         case Signal.AUTHENTICATED:
 
             await state.set_state(InitialState.TO_APPLICATION)
 
+            return await main_menu_handler(message, state)
+
         case Signal.NOT_AUTHENTICATED:
 
             await state.set_state(InitialState.TO_AUTHENTICATION)
 
-            return message.answer(
+            bot_message = await message.answer(
                 f'<code>Привет, {message.from_user.username}!\n\nЧтобы авторизоваться введи пароль:</code>')
+
+            await state.update_data({'last_bot_msg_id': bot_message.message_id})
+
+            return bot_message
 
         case Signal.NOT_REGISTERED:
 
             await state.set_state(InitialState.TO_REGISTRATION)
 
-            return message.answer(
+            bot_message = await message.answer(
                 f'<code>Привет, {message.from_user.username}\n\nЧтобы начать пользоваться нашим магазином нужно '
                 f'зарегистрироваться.\n\nЭто займет совсем немного времни, начнем?</code>',
                 reply_markup=await get_registration_keyboard())
+
+            await state.update_data({'last_bot_msg_id': bot_message.message_id})
+
+            return bot_message
 
         case _:
             # 500 server error
@@ -67,15 +78,15 @@ async def register_user_handler(query: CallbackQuery, state: FSMContext):
 
     await state.set_state(RegState.INPUT_FIRST_NAME)
 
-    bot_msg = await query.message.answer('<code>Введите имя:</code>')
+    bot_message = await query.message.answer('<code>Введите имя:</code>')
 
-    await state.update_data({'last_bot_msg_id': bot_msg.message_id})
+    await state.update_data({'last_bot_msg_id': bot_message.message_id})
 
 
 @router.message(
     RegState.INPUT_FIRST_NAME,
 )
-async def input_first_name(message: Message, state: FSMContext) -> None:
+async def input_first_name(message: Message, state: FSMContext) -> Optional[Message]:
 
     return await validate_user_registration(
         message,
@@ -91,7 +102,7 @@ async def input_first_name(message: Message, state: FSMContext) -> None:
 @router.message(
     RegState.INPUT_LAST_NAME,
 )
-async def input_last_name(message: Message, state: FSMContext) -> None:
+async def input_last_name(message: Message, state: FSMContext) -> Optional[Message]:
 
     return await validate_user_registration(
         message,
@@ -107,7 +118,7 @@ async def input_last_name(message: Message, state: FSMContext) -> None:
 @router.message(
     RegState.INPUT_PASSWORD,
 )
-async def input_password(message: Message, state: FSMContext) -> None:
+async def input_password(message: Message, state: FSMContext) -> Optional[Message]:
 
     return await validate_user_registration(
         message,
@@ -124,7 +135,7 @@ async def input_password(message: Message, state: FSMContext) -> None:
 @router.message(
     RegState.INPUT_PASSWORD_CONFIRMATION,
 )
-async def input_password_confirmation(message: Message, state: FSMContext) -> None:
+async def input_password_confirmation(message: Message, state: FSMContext) -> Optional[Message]:
 
     return await validate_user_registration(
         message,
@@ -143,7 +154,7 @@ async def input_password_confirmation(message: Message, state: FSMContext) -> No
     RegState.CONFIRM_REGISTRATION,
     F.text == 'Да',
 )
-async def confirm_registration(message: Message, state: FSMContext) -> Union[Message, None]:
+async def confirm_registration(message: Message, state: FSMContext) -> Optional[Message]:
 
     data = await state.get_data()
 
@@ -161,7 +172,9 @@ async def confirm_registration(message: Message, state: FSMContext) -> Union[Mes
     pwd_matched = await password_matched(password, password_confirmation)
 
     if not pwd_matched:
-        return await message.answer('Пароли не совпадают!')
+        bot_message = await message.answer('<code>Упс, пароли не совпадают... Может вы опечатались?</code>')
+        await state.update_data({'last_bot_msg_id': bot_message.message_id})
+        return bot_message
 
     r_cli = await connect_redis_url()
     now = int(time.time())
@@ -177,24 +190,30 @@ async def confirm_registration(message: Message, state: FSMContext) -> Union[Mes
                 await session.commit()
     except sqlalchemy.exc.SQLAlchemyError:
         await transaction.rollback()
-        return await message.answer('Что-то пошло не так...')
+        bot_message = await message.answer('<code>Упс, что-то пошло не так...</code>')
+        await state.update_data({'last_bot_msg_id': bot_message.message_id})
+
     else:
         await r_cli.hset(f'auth_hash:{tg_id}', mapping={
             'hash': credentials.auth_hash,
             'last_seen': now,
         })
-        return await message.answer('Успешная регистрация!')
 
+        bot_message = await message.answer('Успешная регистрация!')
+        await state.update_data({'last_bot_msg_id': bot_message.message_id})
+        return
 
 @router.message(
     RegState.CONFIRM_REGISTRATION,
     F.text == 'Нет',
 )
-async def refuse_registration(message: Message, state: FSMContext) -> None:
+async def refuse_registration(message: Message, state: FSMContext) -> Message:
 
-    await message.answer('Очень жаль... может быть в другой раз?')
+    bot_message = await message.answer('<code>Очень жаль... может быть в другой раз?</code>')
 
-    return
+    await state.update_data({'last_bot_msg_id': bot_message.message_id})
+
+    return bot_message
 
 
 @router.message(
@@ -205,16 +224,25 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
     tg_id = message.from_user.id
     pwd = message.text
 
-    if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', pwd):
-        return await message.answer('У вас ошибка, может вы опечатались?')
+    data = await state.get_data()
 
+    last_bot_msg_id = data.get('last_bot_msg_id')
+
+    if last_bot_msg_id is not None:
+        await message.chat.delete_message(message_id=last_bot_msg_id)
+
+    if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', pwd):
+        bot_message = await message.answer('<code>У вас ошибка, может вы опечатались?</code>')
+        await state.update_data({'last_bot_msg_id': bot_message.message_id})
+        await message.chat.delete_message(message_id=message.message_id)
+        return bot_message
     try:
         async with PostgresAsyncSession() as session:
             async with session.begin() as transaction:
                 try:
                     user_id = await Users.get_user_id(tg_id, session)
                 except UserNotFound:
-                    await message.answer('Упс, такого пользователя не существует...')
+                    await message.answer('<code>Упс, такого пользователя не существует...</code>')
                     await transaction.rollback()
                 else:
                     credentials = await session.execute(select(Credentials).filter_by(user_id=user_id))
@@ -222,9 +250,21 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
                     pwd_matched = await credentials.check_password(pwd)
 
                     if not pwd_matched:
-                        return await message.answer('Увы, пароли не совпадают. Может вы опечатались?')
+
+                        await message.chat.delete_message(message_id=message.message_id)
+
+                        bot_message = await message.answer('<code>Увы, пароли не совпадают. Может вы опечатались?</code>')
+
+                        await state.update_data({'last_bot_msg_id': bot_message.message_id})
+
+                        return bot_message
+
+                    await message.chat.delete_message(message_id=message.message_id)
+
                     await state.set_state(InitialState.TO_APPLICATION)
-                    print(await state.get_state())
+
+                    return await main_menu_handler(message, state)
+
     except sqlalchemy.exc.SQLAlchemyError:
         await transaction.rollback()
-        return await message.answer('Упс, что-то пошло не так...')
+        return await message.answer('<code>Упс, что-то пошло не так...</code>')
