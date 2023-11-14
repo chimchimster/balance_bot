@@ -18,11 +18,28 @@ async def main_menu_markup() -> InlineKeyboardMarkup:
 
 async def personal_account_markup() -> InlineKeyboardMarkup:
 
-    orders_button = InlineKeyboardButton(text='Все заказы', callback_data='orders')
+    orders_button = InlineKeyboardButton(text='К заказам', callback_data='orders')
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [orders_button],
     ])
+
+    return keyboard
+
+
+async def bought_items_markup(has_next: bool, has_prev: bool) -> InlineKeyboardMarkup:
+
+    buttons = []
+
+    if has_next:
+        next_button = InlineKeyboardButton(text='Вперед', callback_data=PersonalOrdersCallbackData(flag=True).pack())
+        buttons.append(next_button)
+
+    if has_prev:
+        prev_button = InlineKeyboardButton(text='Назад', callback_data=PersonalOrdersCallbackData(flag=False).pack())
+        buttons.append(prev_button)
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons])
 
     return keyboard
 
