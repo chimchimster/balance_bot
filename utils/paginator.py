@@ -4,17 +4,27 @@ from typing import List
 class Paginator:
     def __init__(
             self,
-            struct: List,
-            flag: bool,
+            struct: List
     ) -> None:
         self._struct = struct
         self._current = -1
-        self._flag = flag
+        self._flag = None
+
+    @property
+    def flag(self):
+        return self._flag
+
+    @flag.setter
+    def flag(self, value):
+        self._flag = value
 
     def __iter__(self):
         return self
 
     def __next__(self):
+
+        if self._flag is None:
+            return None
 
         if self._flag:
             self._current += 1

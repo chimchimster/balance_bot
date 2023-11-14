@@ -1,6 +1,6 @@
-from typing import List
-
+import ctypes
 import sqlalchemy.exc
+
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
@@ -17,6 +17,7 @@ from states.states import InitialState, PersonalState
 from balance_bot.utils.jinja_template import render_template
 from database.session import AsyncSessionLocal
 from utils.paginator import Paginator
+from handlers.utils.named_entities import BoughtItem
 
 router = Router()
 
@@ -64,7 +65,7 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                         user_id, first_name, last_name, total_orders_count, total_orders_price = data
                     else:
                         raise UserNotFound
-
+                    # ТУТ ОШИБКА!
                     await state.update_data({'user_id': user_id, 'first_name': first_name, 'last_name': last_name})
                 except UserNotFound:
                     bot_message = await query.message.answer('<code>Пользователь не найден</code>')
@@ -97,7 +98,7 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
     # orders_count, addresses, last_order, show_all_orders
 
     data = await state.get_data()
-
+    # ТУТ ОШИБКА!
     user_id = data.get('user_id')
 
     if user_id is None:
@@ -124,13 +125,9 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
                 )
 
                 data = stmt_result.fetchmany(100)
-
+                await state.update_data({user_id: data})
                 if data:
-                    await paginate_over_bought_items(
-                        query.message,
-                        PersonalOrdersCallbackData(flag=True),
-                        data,
-                    )
+                    await paginate_over_bought_items(query, state)
                 else:
                     pass
 
@@ -140,19 +137,50 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
         return bot_message
 
 
+@router.callback_query(
+    F.data.in_(
+        [
+            PersonalOrdersCallbackData(flag=True).pack(),
+            PersonalOrdersCallbackData(flag=False).pack()
+        ]
+    )
+)
 async def paginate_over_bought_items(
-        message: Message,
-        callback_data: PersonalOrdersCallbackData,
-        struct,
+        query: CallbackQuery,
+        state: FSMContext,
 ):
 
-    flag = callback_data.flag
+    data = await state.get_data()
 
-    paginator = Paginator(struct, flag)
+    # ОШИБКА В ПАГИНАТОРЕ И ПОДХОДЕ!!! ТАКУЮ ГЛУПСТЬ Я ЕЩЕ НЕ ПИСАЛ
+    db_data = data.get('user_id')
 
-    html = render_template('account/item_detail.html', )
+    paginator = Paginator()
 
-    await message.answer()
-    print(paginator.__next__())
+    c_data = query.data
+    if isinstance(c_data, str):
+        c_data = PersonalOrdersCallbackData(flag=True)
+
+    flag = c_data.flag
+    print(type(paginator), paginator.__dict__)
+    paginator.flag = flag
+
+    p_value = BoughtItem(*next(paginator))
+
+    html = await render_template(
+        'account/item_detail.html',
+        item_title=p_value.item_title,
+        item_description=p_value.item_description,
+        item_price=p_value.item_price,
+        brand_name=p_value.brand_name,
+        image_path=p_value.image_path,
+    )
+
+    has_next = paginator.has_next()
+    has_prev = paginator.has_prev()
+
+    bot_message = await query.message.answer(text=html, reply_markup=await bought_items_markup(has_next, has_prev))
+
+    return bot_message
 
 

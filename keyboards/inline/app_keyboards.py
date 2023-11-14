@@ -31,16 +31,16 @@ async def bought_items_markup(has_next: bool, has_prev: bool) -> InlineKeyboardM
 
     buttons = []
 
-    if has_next:
-        next_button = InlineKeyboardButton(text='Вперед', callback_data=PersonalOrdersCallbackData(flag=True).pack())
-        buttons.append(next_button)
-
     if has_prev:
         prev_button = InlineKeyboardButton(text='Назад', callback_data=PersonalOrdersCallbackData(flag=False).pack())
         buttons.append(prev_button)
+
+    if has_next:
+        next_button = InlineKeyboardButton(text='Вперед', callback_data=PersonalOrdersCallbackData(flag=True).pack())
+        buttons.append(next_button)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons])
 
     return keyboard
 
-__all__ = ['main_menu_markup',]
+__all__ = ['main_menu_markup', 'bought_items_markup',]
