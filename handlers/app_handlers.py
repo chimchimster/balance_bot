@@ -13,13 +13,14 @@ from database.models.exceptions.models_exc import UserNotFound
 from keyboards.inline.app_keyboards import *
 from database.models import *
 from keyboards.inline.app_keyboards import personal_account_markup
-from states.states import InitialState, PersonalState
+from states.states import InitialState
 from balance_bot.utils.jinja_template import render_template
 from database.session import AsyncSessionLocal
-from utils.paginator import Paginator
+from utils.paginator import Paginator, PaginatorStorage
 from handlers.utils.named_entities import BoughtItem
 
 router = Router()
+paginator_storage = PaginatorStorage()
 
 
 @router.message(
@@ -37,6 +38,7 @@ async def main_menu_handler(message: Message, state: FSMContext):
     F.data == 'personal_account',
 )
 async def personal_account_handler(query: CallbackQuery, state: FSMContext):
+
     tg_id = query.message.chat.id
 
     try:
@@ -65,7 +67,7 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                         user_id, first_name, last_name, total_orders_count, total_orders_price = data
                     else:
                         raise UserNotFound
-                    # ТУТ ОШИБКА!
+                    print(type(tg_id), tg_id)
                     await state.update_data({'user_id': user_id, 'first_name': first_name, 'last_name': last_name})
                 except UserNotFound:
                     bot_message = await query.message.answer('<code>Пользователь не найден</code>')
@@ -98,7 +100,8 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
     # orders_count, addresses, last_order, show_all_orders
 
     data = await state.get_data()
-    # ТУТ ОШИБКА!
+
+    tg_id = query.message.chat.id
     user_id = data.get('user_id')
 
     if user_id is None:
@@ -125,12 +128,17 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
                 )
 
                 data = stmt_result.fetchmany(100)
-                await state.update_data({user_id: data})
+
+                paginator = Paginator(data)
+
+                async with paginator_storage:
+                    paginator_storage[tg_id] = paginator
+
                 if data:
                     await paginate_over_bought_items(query, state)
                 else:
+                    # empty orders list template rendering
                     pass
-
     except sqlalchemy.exc.SQLAlchemyError:
         bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
         await query.message.chat.delete_message(message_id=bot_message.message_id)
@@ -149,21 +157,26 @@ async def paginate_over_bought_items(
         query: CallbackQuery,
         state: FSMContext,
 ):
-
     data = await state.get_data()
 
-    # ОШИБКА В ПАГИНАТОРЕ И ПОДХОДЕ!!! ТАКУЮ ГЛУПСТЬ Я ЕЩЕ НЕ ПИСАЛ
-    db_data = data.get('user_id')
+    last_bot_msg_id = data.get('last_bot_msg_id')
 
-    paginator = Paginator()
+    if last_bot_msg_id is not None:
+        await query.message.chat.delete_message(message_id=last_bot_msg_id)
+
+    tg_id = query.message.chat.id
+
+    async with paginator_storage:
+        paginator = paginator_storage[tg_id]
 
     c_data = query.data
-    if isinstance(c_data, str):
+    if c_data == 'orders':
         c_data = PersonalOrdersCallbackData(flag=True)
+        flag = c_data.flag
+    else:
+        flag = True if c_data.split(':')[-1] == '1' else False
 
-    flag = c_data.flag
-    print(type(paginator), paginator.__dict__)
-    paginator.flag = flag
+    paginator.direction = flag
 
     p_value = BoughtItem(*next(paginator))
 
@@ -178,9 +191,9 @@ async def paginate_over_bought_items(
 
     has_next = paginator.has_next()
     has_prev = paginator.has_prev()
-
+    print(has_next, has_prev)
     bot_message = await query.message.answer(text=html, reply_markup=await bought_items_markup(has_next, has_prev))
-
+    await state.update_data({'last_bot_msg_id': bot_message.message_id})
     return bot_message
 
 
