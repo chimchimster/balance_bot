@@ -35,7 +35,7 @@ class Paginator:
             raise StopIteration
 
     def has_next(self) -> bool:
-        print(self._current, len(self._struct) - 1)
+
         return self._current < len(self._struct) - 1
 
     def has_prev(self) -> bool:

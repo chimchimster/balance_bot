@@ -9,3 +9,16 @@ BoughtItem = namedtuple('Item', [
             'image_path',
         ]
     )
+
+
+AddressItem = namedtuple('Address', [
+            'address_country',
+            'address_city',
+            'address_street',
+            'address_apartment',
+            'address_phone',
+        ]
+    )
+
+
+__all__ = ['BoughtItem', 'AddressItem',]

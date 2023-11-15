@@ -1,0 +1,12 @@
+<code>{% for adr in addresses %}
+Адрес №{{ loop.index }}
+Регион: {{ adr.address_country }}
+Город: {{ adr.address_city }}
+Улица: {{ adr.address_street }}
+Дом/квартира: {{ adr.address_apartment }}
+Телефон: {{ adr.address_phone }}
+{% if not loop.last %}
+__________________________
+{% endif %}
+{% endfor %}
+</code>
