@@ -15,5 +15,9 @@ class RegState(StatesGroup):
     CONFIRM_REGISTRATION = State()
 
 
-class PersonalState(StatesGroup):
-    PERSONAL_INFO = State()
+class SetNewAddressState(StatesGroup):
+    REGION = State()
+    CITY = State()
+    STREET = State()
+    APARTMENT = State()
+    PHONE = State()

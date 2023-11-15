@@ -144,13 +144,13 @@ class Addresses(Base):
             raise IncorrectInput(f'Допускается длина поля country равной 2-м символам и может содержать только заглавные'
                                  f' латинские буквы.')
 
-        if not re.match(r'\w{5,50}', city):
+        if not re.match(r'[А-Яа-я\s]{5,50}', city):
             raise IncorrectInput(f'Допускается длина поля city от 5 до 50 символов.')
 
-        if not re.match(r'\w{5,255}', street):
+        if not re.match(r'[А-Яа-я\s]{5,255}', street):
             raise IncorrectInput(f'Допускается длина поля street от 5 до 255 символов.')
 
-        if not re.match(r'[\w\d]{1,10}', apartment):
+        if not re.match(r'[А-Яа-я\d]{1,10}', apartment):
             raise IncorrectInput(f'Допускается длина поля apartment от 1 до 10 символов.')
 
         if not re.match(r'^(\+7|8)\d{7,10}$', phone):
