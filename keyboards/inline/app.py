@@ -21,11 +21,13 @@ async def personal_account_markup() -> InlineKeyboardMarkup:
     orders_button = InlineKeyboardButton(text='Мои заказы', callback_data='orders')
     show_addresses = InlineKeyboardButton(text='Мои адреса', callback_data='show_addresses')
     add_address = InlineKeyboardButton(text='Добавить адрес доставки', callback_data='add_address')
+    return_to_main_menu = InlineKeyboardButton(text='Вернуться на главную', callback_data='back_to_main_menu')
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [orders_button],
         [show_addresses],
         [add_address],
+        [return_to_main_menu],
     ])
 
     return keyboard

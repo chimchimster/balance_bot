@@ -14,11 +14,11 @@ from database.models import *
 from database.handlers.utils.session import PostgresAsyncSession
 from database.handlers.utils.redis_client import connect_redis_url
 from database.models.exceptions.models_exc import *
-from keyboards.inline.auth_keyboards import *
+from keyboards.inline.auth import *
 from signals.signals import Signal
 from states.states import InitialState, RegState
 from handlers.utils.auxillary import validate_user_registration, password_matched
-from handlers.app_handlers import main_menu_handler
+from handlers.app import main_menu_handler
 
 
 router = Router()

@@ -64,7 +64,14 @@ class ItemMeta(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
+    class Sex(enum.Enum):
+        male = 'male'
+        female = 'female'
+
     item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
+    size = Column(DECIMAL(3, 2), nullable=False)
+    color = Column(String(15), nullable=False)
+    sex = Column(Enum(Sex, schema='commerce'))
 
     items = relationship('Items', back_populates='item_meta', uselist=False, single_parent=True)
 
@@ -83,6 +90,28 @@ class Brands(Base):
 
 
 Index('idx_brand_id', Brands.id)
+
+
+class Colors(Base):
+
+    __tablename__ = 'colors'
+    __table_args__ = (
+        {'schema': 'commerce'} if not DEBUG else None,
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(length=15))
+
+
+class Sizes(Base):
+
+    __tablename__ = 'sizes'
+    __table_args__ = (
+        {'schema': 'commerce'} if not DEBUG else None,
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    size = Column(DECIMAL(4, 2))
 
 
 class OrderItem(Base):

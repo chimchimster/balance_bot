@@ -139,7 +139,7 @@ class Addresses(Base):
             phone: str,
             session: AsyncSession,
     ) -> int:
-
+        print(type(phone), phone)
         if not re.match(r'[A-Z]{2}', country):
             raise IncorrectInput(f'Допускается длина поля country равной 2-м символам и может содержать только заглавные'
                                  f' латинские буквы.')

@@ -1,56 +1,25 @@
-import ctypes
 import re
-from typing import Union
-
 import sqlalchemy.exc
-
-from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
 
 from sqlalchemy import select
 from sqlalchemy.sql.functions import count, func
 
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
+
+from database.models import *
+from keyboards.inline.app import personal_account_markup, bought_items_markup
 from callback_data.callback_data import PersonalOrdersCallbackData
 from database.models.exceptions.models_exc import UserNotFound
-from keyboards.inline.app_keyboards import *
-from database.models import *
-from keyboards.inline.app_keyboards import personal_account_markup
-from states.states import InitialState, SetNewAddressState
-from balance_bot.utils.jinja_template import render_template
+from states.states import SetNewAddressState
 from database.session import AsyncSessionLocal
-from utils.paginator import Paginator, PaginatorStorage
 from handlers.utils.named_entities import *
+from utils.jinja_template import render_template
+from utils.paginator import Paginator, PaginatorStorage
 
 router = Router()
 paginator_storage = PaginatorStorage()
-
-
-async def send_main_manu(obj: Union[Message, CallbackQuery], state: FSMContext):
-    await state.clear()
-
-    html = await render_template('menu/main_menu.html')
-
-    if isinstance(obj, Message):
-
-        await obj.answer(text=html, reply_markup=await main_menu_markup())
-    else:
-
-        await obj.message.answer(text=html, reply_markup=await main_menu_markup())
-
-
-@router.message(
-    InitialState.TO_APPLICATION,
-)
-async def main_menu_handler(message: Message, state: FSMContext):
-    await send_main_manu(message, state)
-
-
-@router.callback_query(
-    F.data == 'back_to_main_menu'
-)
-async def main_menu_callback_handler(query: CallbackQuery, state: FSMContext):
-    await send_main_manu(query, state)
 
 
 @router.callback_query(
@@ -113,7 +82,6 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
     F.data == 'orders',
 )
 async def all_orders_handler(query: CallbackQuery, state: FSMContext):
-    # orders_count, addresses, last_order, show_all_orders
 
     data = await state.get_data()
 
@@ -382,13 +350,15 @@ async def add_phone_handler(message: Message, state: FSMContext):
 
     user_wrote = message.text
     if not re.match(r'^(\+7|8)\d{7,10}$', user_wrote):
-        bot_message = message.answer(
+        bot_message = await message.answer(
             text='<code>Допустимый формат номера телефона +79999999999.</code>'
         )
         await state.update_data({'bot_last_msg_id': bot_message.message_id})
         return
 
-    await state.update_data({'phone_number': user_wrote})
+    await state.update_data({'phone': user_wrote})
+
+    data = await state.get_data()
 
     user_id = data.get('user_id')
     region = data.get('region')
@@ -410,12 +380,11 @@ async def add_phone_handler(message: Message, state: FSMContext):
                     session=session,
                 )
                 await session.commit()
+
+                bot_message = await message.answer('<code>Адрес успешно добавлен!</code>')
+                await state.update_data({'bot_last_msg_id': bot_message.message_id})
+                return bot_message
     except sqlalchemy.exc.SQLAlchemyError:
         bot_message = await message.answer('<code>Упс, что-то пошло не так...</code>')
         await message.chat.delete_message(message_id=bot_message.message_id)
         return bot_message
-
-
-@router.message()
-async def handle_404(message: Message):
-    await message.answer('<code>Запрашиваемые вами данные не найдены, пожалуйста, обратитесь в поддержку!</code>')
