@@ -14,5 +14,7 @@ __all__ = [
     'Orders',
     'Deliveries',
     'Colors',
-    'Base'
+    'Sex',
+    'Sizes',
+    'Base',
 ]

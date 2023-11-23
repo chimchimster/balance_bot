@@ -111,7 +111,22 @@ class Sizes(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    size = Column(DECIMAL(4, 2))
+    title = Column(DECIMAL(4, 2))
+
+
+class Sex(Base):
+
+    __tablename__ = 'sexes'
+    __table_args__ = (
+        {'schema': 'commerce'} if not DEBUG else None,
+    )
+
+    class Sex(enum.Enum):
+        male = 'male'
+        female = 'female'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(Enum(Sex, schema='commerce'))
 
 
 class OrderItem(Base):

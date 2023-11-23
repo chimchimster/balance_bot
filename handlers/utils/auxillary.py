@@ -1,8 +1,21 @@
 import re
+import itertools
+from typing import Optional
+
+import sqlalchemy.exc
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.methods import EditMessageReplyMarkup
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, CallbackQuery
+
+from sqlalchemy import select
+
+from database.models import *
+from database.session import AsyncSessionLocal
+from keyboards.inline.purchases import get_search_filter_keyboard
+
+from bot import bot as balance_bot
 
 
 async def validate_user_registration(
@@ -59,3 +72,62 @@ async def password_matched(password: str, password_confirmation: str) -> bool:
     if password != password_confirmation:
         return False
     return True
+
+
+async def filter_products(
+        filter_name: str,
+        table,
+        query: CallbackQuery,
+        state: FSMContext
+) -> Optional[Message]:
+
+    data = await state.get_data()
+    last_bot_msg_id = data.get('last_bot_msg_id')
+
+    product_filter = data.get(filter_name)
+
+    if not product_filter:
+        try:
+            async with AsyncSessionLocal() as session:
+                async with session.begin():
+                    select_stmt = select(table.id, table.title)
+                    objects = await session.execute(select_stmt)
+                    objects = objects.fetchall()
+
+                    await state.update_data(
+                        {filter_name: ':'.join([','.join(tuple(map(str, obj))) for obj in objects + [('0', 'Без фильтра')]])})
+        except sqlalchemy.exc.SQLAlchemyError:
+            bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
+            await state.update_data({'last_bot_msg_id': bot_message.message_id})
+            return bot_message
+    else:
+        objects = [tuple(obj.split(',')) for obj in product_filter.split(':')] + [('0', 'Без фильтра')]
+
+    prev_obj = data.get(f'current_{filter_name.split("_")[0]}')
+
+    objects_gen = itertools.cycle(objects)
+
+    current_obj = next(
+        itertools.islice(objects_gen, int(prev_obj.split(',')[0]) if prev_obj is not None else 0, None), None
+    )
+
+    if current_obj:
+
+        await state.update_data({f'current_{filter_name.split("_")[0]}': ','.join(map(str, current_obj))})
+
+        data = await state.get_data()
+
+        current_brand = data.get('current_brand')
+        current_color = data.get('current_color')
+        current_size = data.get('current_size')
+        current_sex = data.get('current_sex')
+
+        await EditMessageReplyMarkup(
+            chat_id=query.message.chat.id, message_id=last_bot_msg_id,
+            reply_markup=await get_search_filter_keyboard(
+                brand=current_brand.split(',')[-1] if current_brand is not None else None,
+                color=current_color.split(',')[-1] if current_color is not None else None,
+                size=current_size.split(',')[-1] if current_size is not None else None,
+                sex=current_sex.split(',')[-1] if current_sex is not None else None,
+            )
+        ).as_(balance_bot)
