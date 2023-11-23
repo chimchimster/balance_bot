@@ -2,6 +2,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, Text, DECIMAL, Boolean, ForeignKey, Index, DateTime, Enum
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 
 from .base import Base
@@ -64,14 +65,14 @@ class ItemMeta(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    class Sex(enum.Enum):
+    class Gender(enum.Enum):
         male = 'male'
         female = 'female'
 
     item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
-    size = Column(DECIMAL(3, 2), nullable=False)
-    color = Column(String(15), nullable=False)
-    sex = Column(Enum(Sex, schema='commerce'))
+    size = Column(ARRAY(DECIMAL(4, 2)), nullable=False)
+    color = Column(ARRAY(String(15)), nullable=False)
+    sex = Column(Enum(Gender, schema='commerce'))
 
     items = relationship('Items', back_populates='item_meta', uselist=False, single_parent=True)
 
@@ -121,12 +122,12 @@ class Sex(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
-    class Sex(enum.Enum):
+    class Gender(enum.Enum):
         male = 'male'
         female = 'female'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    title = Column(Enum(Sex, schema='commerce'))
+    title = Column(Enum(Gender, schema='commerce'))
 
 
 class OrderItem(Base):

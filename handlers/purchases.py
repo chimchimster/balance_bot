@@ -5,7 +5,7 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from sqlalchemy import select, join
+from sqlalchemy import select, join, Text, text, TEXT, any_
 
 from database.models import *
 from database.session import AsyncSessionLocal
@@ -22,7 +22,6 @@ paginator_storage = PaginatorStorage()
     F.data == 'purchases'
 )
 async def search_filter_handler(query: CallbackQuery, state: FSMContext):
-
     await state.clear()
 
     bot_message = await query.message.answer(text='<code>Выберте подходящие фильтры:</code>',
@@ -37,7 +36,6 @@ async def search_filter_handler(query: CallbackQuery, state: FSMContext):
     F.data == 'choose_brand',
 )
 async def choose_brand_handler(query: CallbackQuery, state: FSMContext):
-
     await filter_products('brand_filter', Brands, query, state)
 
 
@@ -45,7 +43,6 @@ async def choose_brand_handler(query: CallbackQuery, state: FSMContext):
     F.data == 'choose_color',
 )
 async def choose_size_handler(query: CallbackQuery, state: FSMContext):
-
     await filter_products('color_filter', Colors, query, state)
 
 
@@ -53,7 +50,6 @@ async def choose_size_handler(query: CallbackQuery, state: FSMContext):
     F.data == 'choose_sex',
 )
 async def choose_sex_handler(query: CallbackQuery, state: FSMContext):
-
     await filter_products('sex_filter', Sex, query, state)
 
 
@@ -61,7 +57,6 @@ async def choose_sex_handler(query: CallbackQuery, state: FSMContext):
     F.data == 'choose_size',
 )
 async def choose_size_handler(query: CallbackQuery, state: FSMContext):
-
     await filter_products('size_filter', Sizes, query, state)
 
 
@@ -69,7 +64,6 @@ async def choose_size_handler(query: CallbackQuery, state: FSMContext):
     F.data == 'apply_filters',
 )
 async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Optional[Message]:
-
     tg_id = query.message.chat.id
 
     data = await state.get_data()
@@ -81,6 +75,11 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
 
     await state.update_data({'current_filters': {'color': color, 'brand': brand, 'sex': sex, 'size': size}})
 
+    size_title = size.split(',')[-1]
+    color_title = color.split(',')[-1]
+    sex_title = sex.split(',')[-1]
+    brand_title = brand.split(',')[-1]
+
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -89,22 +88,36 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
                     Items.price,
                     Items.description,
                 ).select_from(
-                    join(Items, Items.id == ItemsImages.item_id),
+                    join(Items, ItemsImages, Items.id == ItemsImages.item_id).
                     join(Images, ItemsImages.image_id == Images.id).
-                    join(Brands, Items.brand_id == Brands.id).
-                    join(ItemMeta, ItemMeta.item_id == Items.id)
+                    join(Brands, ItemsImages.item_id == Brands.id).
+                    join(ItemMeta, ItemsImages.item_id == ItemMeta.item_id)
                 ).where(
-                    ItemMeta.size.contains([size.split(',')[-1]]),
-                    ItemMeta.color.contains([color.split(',')[-1]]),
-                    ItemMeta.sex == sex.split(',')[-1],
+                    ItemMeta.size.contains([float(size_title)]) if size_title != 'Без фильтра' else text(''),
+                    ItemMeta.color.contains([color_title]) if color_title != 'Без фильтра' else text(''),
+                    ItemMeta.sex == sex_title if sex_title != 'Без фильтра' else text(''),
+                    Brands.title == brand_title if brand_title != 'Без фильтра' else text('')
                 )
 
                 result = await session.execute(select_stmt)
-                print(result.fetchall())
 
+                data = result.fetchall()
+
+                paginator = Paginator(data)
+
+                async with paginator_storage:
+                    paginator_storage[tg_id] = paginator
+
+                if data:
+                    await paginate_over_items(query, state)
+                else:
+                    # message that there is no such items and show filters again
+                    pass
     except sqlalchemy.exc.SQLAlchemyError as e:
-        print(e)
         bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
         await state.update_data({'last_bot_msg_id': bot_message.message_id})
         return bot_message
 
+
+async def paginate_over_items(query: CallbackQuery, state: FSMContext):
+    pass
