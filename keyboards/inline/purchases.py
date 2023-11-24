@@ -1,5 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from callback_data.callback_data import AvailableItemsCallbackData
+
 
 async def get_search_filter_keyboard(
         brand: str = None,
@@ -27,5 +29,24 @@ async def get_search_filter_keyboard(
         [sex_button, color_button],
         [apply_filters_button],
     ])
+
+    return keyboard
+
+
+async def items_markup(has_next: bool, has_prev: bool) -> InlineKeyboardMarkup:
+
+    buttons = []
+
+    back_to_main_menu = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
+
+    if has_prev:
+        prev_button = InlineKeyboardButton(text='Назад', callback_data=AvailableItemsCallbackData(flag=False).pack())
+        buttons.append(prev_button)
+
+    if has_next:
+        next_button = InlineKeyboardButton(text='Вперед', callback_data=AvailableItemsCallbackData(flag=True).pack())
+        buttons.append(next_button)
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons, [back_to_main_menu]])
 
     return keyboard

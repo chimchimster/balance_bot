@@ -1,20 +1,21 @@
 import re
 import itertools
-from typing import Optional
+from typing import Optional, Any, Coroutine, Awaitable
 
 import sqlalchemy.exc
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
 from aiogram.methods import EditMessageReplyMarkup
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, CallbackQuery
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, FSInputFile
 
 from sqlalchemy import select
 
-from database.models import *
 from database.session import AsyncSessionLocal
+from keyboards.inline.app import bought_items_markup
 from keyboards.inline.purchases import get_search_filter_keyboard
-
+from utils.jinja_template import render_template
+from utils.paginator import PaginatorStorage
 from bot import bot as balance_bot
 
 
@@ -131,3 +132,62 @@ async def filter_products(
                 sex=current_sex.split(',')[-1] if current_sex is not None else None,
             )
         ).as_(balance_bot)
+
+
+async def paginate(
+        query: CallbackQuery,
+        state: FSMContext,
+        next_obj: Any,
+        previous_callback_name: str,
+        callback_data: Any,
+        template_name: str,
+        reply_coroutine,
+        paginator_storage: PaginatorStorage,
+):
+    data = await state.get_data()
+
+    last_bot_msg_id = data.get('last_bot_msg_id')
+    last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
+
+    if last_bot_msg_id is not None:
+        await query.message.chat.delete_message(message_id=last_bot_msg_id)
+
+    if last_bot_msg_photo_id is not None:
+        await query.message.chat.delete_message(message_id=last_bot_msg_photo_id)
+
+    tg_id = query.message.chat.id
+
+    async with paginator_storage:
+        paginator = paginator_storage[tg_id]
+
+    c_data = query.data
+    if c_data == previous_callback_name:
+        c_data = callback_data(flag=True)
+        flag = c_data.flag
+    else:
+        flag = True if c_data.split(':')[-1] == '1' else False
+
+    paginator.direction = flag
+
+    paginator_value = next_obj(*next(paginator))
+
+    html = await render_template(
+        template_name,
+        item_title=paginator_value.item_title,
+        item_description=paginator_value.item_description,
+        item_price=paginator_value.item_price,
+        brand_name=paginator_value.brand_name.upper(),
+    )
+
+    has_next = paginator.has_next()
+    has_prev = paginator.has_prev()
+
+    bot_message_photo = await query.message.answer_photo(
+        FSInputFile(paginator_value.image_path),
+        caption=paginator_value.item_title,
+    )
+    bot_message = await query.message.answer(text=html, reply_markup=await reply_coroutine(has_next, has_prev))
+    await state.update_data({
+        'last_bot_msg_id': bot_message.message_id,
+        'last_bot_msg_photo_id': bot_message_photo.message_id
+    })

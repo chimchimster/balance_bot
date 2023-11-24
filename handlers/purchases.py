@@ -7,15 +7,16 @@ from aiogram.types import CallbackQuery, Message
 
 from sqlalchemy import select, join, Text, text, TEXT, any_
 
+from callback_data.callback_data import AvailableItemsCallbackData
 from database.models import *
 from database.session import AsyncSessionLocal
-from keyboards.inline.purchases import get_search_filter_keyboard
-from handlers.utils.auxillary import filter_products
-from balance_bot.utils.paginator import Paginator, PaginatorStorage
+from handlers.utils.named_entities import Item
+from keyboards.inline.purchases import get_search_filter_keyboard, items_markup
+from handlers.utils.auxillary import filter_products, paginate
+from balance_bot.utils.paginator import Paginator
+from mem_storage import paginator_storage
 
 router = Router()
-
-paginator_storage = PaginatorStorage()
 
 
 @router.callback_query(
@@ -77,7 +78,7 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
 
     size_title = size.split(',')[-1]
     color_title = color.split(',')[-1]
-    sex_title = sex.split(',')[-1]
+    sex_title = sex.split(',')[-1].split('.')[-1]
     brand_title = brand.split(',')[-1]
 
     try:
@@ -114,10 +115,30 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
                     # message that there is no such items and show filters again
                     pass
     except sqlalchemy.exc.SQLAlchemyError as e:
+        print(e)
         bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
         await state.update_data({'last_bot_msg_id': bot_message.message_id})
         return bot_message
 
 
+@router.callback_query(
+    F.data.in_(
+        [
+            AvailableItemsCallbackData(flag=True).pack(),
+            AvailableItemsCallbackData(flag=False).pack()
+        ]
+    )
+)
 async def paginate_over_items(query: CallbackQuery, state: FSMContext):
-    pass
+
+    await paginate(
+        query,
+        state,
+        Item,
+        'apply_filters',
+        AvailableItemsCallbackData,
+        'account/item_detail.html',
+        items_markup,
+        paginator_storage,
+    )
+

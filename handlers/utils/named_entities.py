@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 
-BoughtItem = namedtuple('Item', [
+Item = namedtuple('Item', [
             'item_title',
             'item_description',
             'item_price',
@@ -21,4 +21,4 @@ AddressItem = namedtuple('Address', [
     )
 
 
-__all__ = ['BoughtItem', 'AddressItem',]
+__all__ = ['Item', 'AddressItem',]

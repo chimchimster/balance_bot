@@ -14,12 +14,13 @@ from callback_data.callback_data import PersonalOrdersCallbackData
 from database.models.exceptions.models_exc import UserNotFound
 from states.states import SetNewAddressState
 from database.session import AsyncSessionLocal
-from handlers.utils.named_entities import *
+from handlers.utils.named_entities import Item, AddressItem
+from handlers.utils.auxillary import paginate
 from utils.jinja_template import render_template
-from utils.paginator import Paginator, PaginatorStorage
+from utils.paginator import Paginator
+from mem_storage import paginator_storage
 
 router = Router()
-paginator_storage = PaginatorStorage()
 
 
 @router.callback_query(
@@ -141,53 +142,17 @@ async def paginate_over_bought_items(
         query: CallbackQuery,
         state: FSMContext,
 ):
-    data = await state.get_data()
 
-    last_bot_msg_id = data.get('last_bot_msg_id')
-    last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
-
-    if last_bot_msg_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_id)
-
-    if last_bot_msg_photo_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_photo_id)
-
-    tg_id = query.message.chat.id
-
-    async with paginator_storage:
-        paginator = paginator_storage[tg_id]
-
-    c_data = query.data
-    if c_data == 'orders':
-        c_data = PersonalOrdersCallbackData(flag=True)
-        flag = c_data.flag
-    else:
-        flag = True if c_data.split(':')[-1] == '1' else False
-
-    paginator.direction = flag
-
-    paginator_value = BoughtItem(*next(paginator))
-
-    html = await render_template(
+    await paginate(
+        query,
+        state,
+        Item,
+        'orders',
+        PersonalOrdersCallbackData,
         'account/item_detail.html',
-        item_title=paginator_value.item_title,
-        item_description=paginator_value.item_description,
-        item_price=paginator_value.item_price,
-        brand_name=paginator_value.brand_name.upper(),
+        bought_items_markup,
+        paginator_storage,
     )
-
-    has_next = paginator.has_next()
-    has_prev = paginator.has_prev()
-
-    bot_message_photo = await query.message.answer_photo(
-        FSInputFile(paginator_value.image_path),
-        caption=paginator_value.item_title,
-    )
-    bot_message = await query.message.answer(text=html, reply_markup=await bought_items_markup(has_next, has_prev))
-    await state.update_data({
-        'last_bot_msg_id': bot_message.message_id,
-        'last_bot_msg_photo_id': bot_message_photo.message_id
-    })
 
 
 @router.callback_query(
