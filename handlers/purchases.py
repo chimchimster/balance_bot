@@ -5,9 +5,10 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from sqlalchemy import select, join, Text, text, TEXT, any_
+from sqlalchemy import select, join, text
 
 from callback_data.callback_data import AvailableItemsCallbackData
+from cart.cart import Cart
 from database.models import *
 from database.session import AsyncSessionLocal
 from handlers.utils.named_entities import Item
@@ -147,3 +148,11 @@ async def paginate_over_items(
         paginator_storage,
     )
 
+
+@router.callback_query(
+    F.data == 'add_to_cart'
+)
+async def add_to_cart_handler(query: CallbackQuery, state: FSMContext):
+
+    tg_id = query.message.chat.id
+    user_cart = Cart(tg_id)

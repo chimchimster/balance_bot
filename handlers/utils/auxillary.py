@@ -143,6 +143,7 @@ async def paginate(
         template_name: str,
         reply_coroutine,
         paginator_storage: PaginatorStorage,
+        is_cart: bool = False,
 ):
     data = await state.get_data()
 
@@ -169,6 +170,12 @@ async def paginate(
 
     paginator.direction = flag
     paginator_value = next_obj(*next(paginator))
+    # ТУТ ОШИБКА!! item_description=Decimal('99.98'), item_price='Красивые и нежные, они такие любимые и неизвестные'
+    print(paginator_value)
+    current_item_serialized = paginator_value._asdict()
+    print(current_item_serialized)
+    if is_cart is not None:
+        await state.update_data({'current_item': current_item_serialized})
 
     html = await render_template(
         template_name,

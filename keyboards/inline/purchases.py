@@ -47,6 +47,8 @@ async def items_markup(has_next: bool, has_prev: bool) -> InlineKeyboardMarkup:
         next_button = InlineKeyboardButton(text='Вперед', callback_data=AvailableItemsCallbackData(flag=True).pack())
         buttons.append(next_button)
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons, [back_to_main_menu]])
+    add_to_cart_button = InlineKeyboardButton(text='Добавить в корзину', callback_data='add_to_cart')
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons, [back_to_main_menu], [add_to_cart_button]])
 
     return keyboard

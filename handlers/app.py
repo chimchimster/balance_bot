@@ -1,10 +1,10 @@
 from typing import Union
 
-
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
+from cart.cart import Cart
 from keyboards.inline.app import *
 
 from states.states import InitialState
@@ -14,15 +14,14 @@ router = Router()
 
 
 async def send_main_manu(obj: Union[Message, CallbackQuery], state: FSMContext):
+
     await state.clear()
 
     html = await render_template('menu/main_menu.html')
 
     if isinstance(obj, Message):
-
         await obj.answer(text=html, reply_markup=await main_menu_markup())
     else:
-
         await obj.message.answer(text=html, reply_markup=await main_menu_markup())
 
 
