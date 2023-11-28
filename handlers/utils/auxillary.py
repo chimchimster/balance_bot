@@ -168,7 +168,6 @@ async def paginate(
         flag = True if c_data.split(':')[-1] == '1' else False
 
     paginator.direction = flag
-
     paginator_value = next_obj(*next(paginator))
 
     html = await render_template(

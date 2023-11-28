@@ -88,11 +88,13 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
                     Items.title,
                     Items.price,
                     Items.description,
+                    Brands.title,
+                    Images.path,
                 ).select_from(
                     join(Items, ItemsImages, Items.id == ItemsImages.item_id).
                     join(Images, ItemsImages.image_id == Images.id).
-                    join(Brands, ItemsImages.item_id == Brands.id).
-                    join(ItemMeta, ItemsImages.item_id == ItemMeta.item_id)
+                    join(Brands, Items.brand_id == Brands.id).
+                    join(ItemMeta, Items.id == ItemMeta.item_id)
                 ).where(
                     ItemMeta.size.contains([float(size_title)]) if size_title != 'Без фильтра' else text(''),
                     ItemMeta.color.contains([color_title]) if color_title != 'Без фильтра' else text(''),
@@ -107,6 +109,7 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
                 paginator = Paginator(data)
 
                 async with paginator_storage:
+
                     paginator_storage[tg_id] = paginator
 
                 if data:
@@ -114,8 +117,7 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
                 else:
                     # message that there is no such items and show filters again
                     pass
-    except sqlalchemy.exc.SQLAlchemyError as e:
-        print(e)
+    except sqlalchemy.exc.SQLAlchemyError:
         bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
         await state.update_data({'last_bot_msg_id': bot_message.message_id})
         return bot_message
@@ -129,7 +131,10 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
         ]
     )
 )
-async def paginate_over_items(query: CallbackQuery, state: FSMContext):
+async def paginate_over_items(
+        query: CallbackQuery,
+        state: FSMContext
+):
 
     await paginate(
         query,

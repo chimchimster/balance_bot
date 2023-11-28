@@ -23,13 +23,16 @@ class Paginator:
         return self
 
     def __next__(self):
-
         if self._direction:
             self._current += 1
+            if self.has_next():
+                return self._struct[self._current]
         else:
-            self._current -= 1
+            if self.has_prev():
+                self._current -= 1
+                return self._struct[self._current]
 
-        if self.has_next() or self.has_prev():
+        if 0 <= self._current < len(self._struct):
             return self._struct[self._current]
         else:
             raise StopIteration
