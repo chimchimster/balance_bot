@@ -33,22 +33,35 @@ async def get_search_filter_keyboard(
     return keyboard
 
 
-async def items_markup(has_next: bool, has_prev: bool) -> InlineKeyboardMarkup:
+async def items_markup(has_next: bool, has_prev: bool, **kwargs) -> InlineKeyboardMarkup:
 
-    buttons = []
+    pagination_buttons = []
 
     back_to_main_menu = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
 
     if has_prev:
         prev_button = InlineKeyboardButton(text='Назад', callback_data=AvailableItemsCallbackData(flag=False).pack())
-        buttons.append(prev_button)
+        pagination_buttons.append(prev_button)
 
     if has_next:
         next_button = InlineKeyboardButton(text='Вперед', callback_data=AvailableItemsCallbackData(flag=True).pack())
-        buttons.append(next_button)
+        pagination_buttons.append(next_button)
 
-    add_to_cart_button = InlineKeyboardButton(text='Добавить в корзину', callback_data='add_to_cart')
+    update_cart = kwargs.get('update_cart')
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons, [back_to_main_menu], [add_to_cart_button]])
+    add_to_cart_button = InlineKeyboardButton(
+        text='Добавлено в корзину ⭐' + ' ' + str(update_cart) if update_cart > 0 else 'Добавить в корзину',
+        callback_data='add_to_cart',
+    )
+
+    delete_from_cart_button = InlineKeyboardButton(text='Убрать из корзины', callback_data='delete_from_cart')
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            pagination_buttons,
+            [add_to_cart_button],
+            [delete_from_cart_button] if update_cart > 0 else [],
+            [back_to_main_menu],
+        ]
+    )
 
     return keyboard

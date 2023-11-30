@@ -1,26 +1,23 @@
-from typing import Optional
+from typing import Optional, Union, Dict
 
 from handlers.utils.named_entities import Item
 
 
 class Cart:
-
-    _instances = {}
-
-    def __new__(cls, *args, **kwargs):
-        if args[0] not in cls._instances:
-            cls._instances[args[0]] = super().__new__(*args, **kwargs)
-
-        return cls._instances[args[0]]
-
     def __init__(self, tg_id: int):
-        if not hasattr(self, '_initialized'):
-            self._initialized = True
-            self._tg_id = tg_id
-            self._items = []
+        self._tg_id = tg_id
+        self._items = []
 
     async def add_item(self, item: Item) -> None:
         self._items.append(item)
+
+    async def get_item(self, item_id: int):
+
+        for item in self._items:
+            if item.get('id') == item_id:
+                return item
+
+        return -1
 
     async def remove_item(self, item: Item) -> Optional[int]:
         try:
@@ -33,3 +30,21 @@ class Cart:
 
     async def clean_up(self):
         self._items.clear()
+
+    async def fill_up(self, previous_data):
+        self._items = previous_data
+
+    @property
+    async def get_items(self) -> list:
+        return self._items
+
+
+class CartManager:
+
+    _carts = {}
+
+    @classmethod
+    async def get_cart(cls, tg_id: int) -> Cart:
+        if tg_id not in cls._carts:
+            cls._carts[tg_id] = Cart(tg_id)
+        return cls._carts[tg_id]

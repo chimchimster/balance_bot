@@ -1,6 +1,7 @@
 import re
 import itertools
-from typing import Optional, Any, Coroutine, Awaitable
+from typing import Optional, Any
+from bisect import bisect_left
 
 import sqlalchemy.exc
 
@@ -16,6 +17,7 @@ from keyboards.inline.app import bought_items_markup
 from keyboards.inline.purchases import get_search_filter_keyboard
 from utils.jinja_template import render_template
 from utils.paginator import PaginatorStorage
+from serializers.serializers import RedisSerializer
 from bot import bot as balance_bot
 
 
@@ -170,29 +172,44 @@ async def paginate(
 
     paginator.direction = flag
     paginator_value = next_obj(*next(paginator))
-    # ТУТ ОШИБКА!! item_description=Decimal('99.98'), item_price='Красивые и нежные, они такие любимые и неизвестные'
-    print(paginator_value)
-    current_item_serialized = paginator_value._asdict()
-    print(current_item_serialized)
+
+    update_cart = False
     if is_cart is not None:
+
+        cart_has_values = data.get('in_cart')
+
+        if not cart_has_values:
+            await state.update_data({'in_cart': []})
+        else:
+            cart_items_ids = [item.get('id') for item in cart_has_values if item]
+            idx_of_obj_in_cart = bisect_left(cart_items_ids, paginator_value.id)
+            update_cart = len([value for value in cart_items_ids if value == paginator_value.id]) \
+                if (idx_of_obj_in_cart != len(cart_items_ids) and cart_items_ids[idx_of_obj_in_cart] == paginator_value.id) else 0
+
+        current_item = paginator_value._asdict()
+        current_item_serialized = await RedisSerializer(current_item).__call__()
         await state.update_data({'current_item': current_item_serialized})
 
     html = await render_template(
         template_name,
-        item_title=paginator_value.item_title,
-        item_description=paginator_value.item_description,
-        item_price=paginator_value.item_price,
+        item_title=paginator_value.title,
+        item_description=paginator_value.description,
+        item_price=paginator_value.price,
         brand_name=paginator_value.brand_name.upper(),
     )
 
     has_next = paginator.has_next()
     has_prev = paginator.has_prev()
+    await state.update_data({'has_next': has_next, 'has_prev': has_prev})
 
     bot_message_photo = await query.message.answer_photo(
         FSInputFile(paginator_value.image_path),
-        caption=paginator_value.item_title,
+        caption=paginator_value.title,
     )
-    bot_message = await query.message.answer(text=html, reply_markup=await reply_coroutine(has_next, has_prev))
+    bot_message = await query.message.answer(
+        text=html,
+        reply_markup=await reply_coroutine(has_next, has_prev, update_cart=update_cart),
+    )
     await state.update_data({
         'last_bot_msg_id': bot_message.message_id,
         'last_bot_msg_photo_id': bot_message_photo.message_id

@@ -1,14 +1,16 @@
-from typing import Optional
+import json
+from typing import Optional, Dict
 
 import sqlalchemy.exc
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
+from aiogram.methods import EditMessageReplyMarkup
 from aiogram.types import CallbackQuery, Message
 
 from sqlalchemy import select, join, text
 
 from callback_data.callback_data import AvailableItemsCallbackData
-from cart.cart import Cart
+from cart.cart import CartManager, Cart
 from database.models import *
 from database.session import AsyncSessionLocal
 from handlers.utils.named_entities import Item
@@ -16,6 +18,7 @@ from keyboards.inline.purchases import get_search_filter_keyboard, items_markup
 from handlers.utils.auxillary import filter_products, paginate
 from balance_bot.utils.paginator import Paginator
 from mem_storage import paginator_storage
+from balance_bot.bot import bot as balance_bot
 
 router = Router()
 
@@ -24,7 +27,10 @@ router = Router()
     F.data == 'purchases'
 )
 async def search_filter_handler(query: CallbackQuery, state: FSMContext):
-    await state.clear()
+
+    old_data = await state.get_data()
+
+    await state.set_data({key: value for key, value in old_data.items() if key == 'in_cart'})
 
     bot_message = await query.message.answer(text='<code>Выберте подходящие фильтры:</code>',
                                              reply_markup=await get_search_filter_keyboard())
@@ -86,9 +92,10 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
         async with AsyncSessionLocal() as session:
             async with session.begin():
                 select_stmt = select(
+                    Items.id,
                     Items.title,
-                    Items.price,
                     Items.description,
+                    Items.price,
                     Brands.title,
                     Images.path,
                 ).select_from(
@@ -154,5 +161,53 @@ async def paginate_over_items(
 )
 async def add_to_cart_handler(query: CallbackQuery, state: FSMContext):
 
+    data = await state.get_data()
+    current_item = data.get('current_item')
+
     tg_id = query.message.chat.id
-    user_cart = Cart(tg_id)
+    cart: Cart = await CartManager.get_cart(tg_id)
+    prev_cart_data = data.get('in_cart')
+    await cart.fill_up(prev_cart_data)
+
+    if current_item is not None:
+        await cart.add_item(current_item)
+        await update_cart_and_reply(query, state, cart, current_item)
+
+
+@router.callback_query(
+    F.data == 'delete_from_cart'
+)
+async def delete_from_cart_handler(query: CallbackQuery, state: FSMContext):
+
+    data = await state.get_data()
+    current_item = data.get('current_item')
+
+    tg_id = query.message.chat.id
+    cart: Cart = await CartManager.get_cart(tg_id)
+    prev_cart_data = data.get('in_cart')
+    await cart.fill_up(prev_cart_data)
+
+    if current_item is not None:
+        await cart.remove_item(current_item)
+        await update_cart_and_reply(query, state, cart, current_item)
+
+
+async def update_cart_and_reply(query: CallbackQuery, state: FSMContext, cart: Cart, current_item: Dict):
+
+    data = await state.get_data()
+
+    last_bot_msg_id = data.get('last_bot_msg_id')
+
+    has_next, has_prev = bool(data.get('has_next', False)), bool(data.get('has_prev', False))
+
+    cart_items = await cart.get_items
+
+    await state.update_data({'in_cart': cart_items})
+
+    update_cart = len([value.get('id') for value in cart_items if value and value['id'] == current_item.get('id')])
+
+    await EditMessageReplyMarkup(
+        message_id=last_bot_msg_id,
+        chat_id=query.message.chat.id,
+        reply_markup=await items_markup(has_next, has_prev, update_cart=update_cart),
+    ).as_(balance_bot)

@@ -2,9 +2,10 @@ from collections import namedtuple
 
 
 Item = namedtuple('Item', [
-            'item_title',
-            'item_description',
-            'item_price',
+            'id',
+            'title',
+            'description',
+            'price',
             'brand_name',
             'image_path',
         ]

@@ -51,4 +51,5 @@ async def bought_items_markup(has_next: bool, has_prev: bool) -> InlineKeyboardM
 
     return keyboard
 
+
 __all__ = ['main_menu_markup', 'bought_items_markup',]

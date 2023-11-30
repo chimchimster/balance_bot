@@ -15,7 +15,9 @@ router = Router()
 
 async def send_main_manu(obj: Union[Message, CallbackQuery], state: FSMContext):
 
-    await state.clear()
+    old_data = await state.get_data()
+
+    await state.set_data({key: value for key, value in old_data.items() if key == 'in_cart'})
 
     html = await render_template('menu/main_menu.html')
 
