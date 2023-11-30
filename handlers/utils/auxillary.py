@@ -184,7 +184,8 @@ async def paginate(
             cart_items_ids = [item.get('id') for item in cart_has_values if item]
             idx_of_obj_in_cart = bisect_left(cart_items_ids, paginator_value.id)
             update_cart = len([value for value in cart_items_ids if value == paginator_value.id]) \
-                if (idx_of_obj_in_cart != len(cart_items_ids) and cart_items_ids[idx_of_obj_in_cart] == paginator_value.id) else 0
+                if (idx_of_obj_in_cart != len(cart_items_ids) and cart_items_ids[idx_of_obj_in_cart] == paginator_value.id) \
+                else 0
 
         current_item = paginator_value._asdict()
         current_item_serialized = await RedisSerializer(current_item).__call__()
@@ -202,13 +203,15 @@ async def paginate(
     has_prev = paginator.has_prev()
     await state.update_data({'has_next': has_next, 'has_prev': has_prev})
 
+    current_filter = data.get('current_filters')
+
     bot_message_photo = await query.message.answer_photo(
         FSInputFile(paginator_value.image_path),
         caption=paginator_value.title,
     )
     bot_message = await query.message.answer(
         text=html,
-        reply_markup=await reply_coroutine(has_next, has_prev, update_cart=update_cart),
+        reply_markup=await reply_coroutine(has_next, has_prev, update_cart=update_cart, current_filter=current_filter),
     )
     await state.update_data({
         'last_bot_msg_id': bot_message.message_id,

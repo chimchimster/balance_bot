@@ -113,7 +113,6 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
                 result = await session.execute(select_stmt)
 
                 data = result.fetchall()
-
                 paginator = Paginator(data)
 
                 async with paginator_storage:
@@ -164,6 +163,19 @@ async def add_to_cart_handler(query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     current_item = data.get('current_item')
 
+    current_filters = data.get('current_filters')
+    if current_filters is not None:
+        current_size = current_filters.get('size')
+        current_color = current_filters.get('color')
+        current_sex = current_filters.get('sex')
+
+        current_size = current_size.split(',')[-1]
+        current_color = current_color.split(',')[-1]
+        current_sex = current_sex.split(',')[-1]
+
+        current_item.update({'size': current_size, 'color': current_color, 'sex': current_sex})
+        await state.update_data({'current_item': current_item})
+
     tg_id = query.message.chat.id
     cart: Cart = await CartManager.get_cart(tg_id)
     prev_cart_data = data.get('in_cart')
@@ -204,10 +216,12 @@ async def update_cart_and_reply(query: CallbackQuery, state: FSMContext, cart: C
 
     await state.update_data({'in_cart': cart_items})
 
-    update_cart = len([value.get('id') for value in cart_items if value and value['id'] == current_item.get('id')])
+    update_cart = len([value.get('id') for value in cart_items if value and value.get('id') == current_item.get('id')])
+
+    current_filter = data.get('current_filters')
 
     await EditMessageReplyMarkup(
         message_id=last_bot_msg_id,
         chat_id=query.message.chat.id,
-        reply_markup=await items_markup(has_next, has_prev, update_cart=update_cart),
+        reply_markup=await items_markup(has_next, has_prev, update_cart=update_cart, current_filter=current_filter),
     ).as_(balance_bot)

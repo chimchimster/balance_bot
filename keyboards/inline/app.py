@@ -7,10 +7,12 @@ async def main_menu_markup() -> InlineKeyboardMarkup:
 
     personal_button = InlineKeyboardButton(text='В личный кабинет', callback_data='personal_account')
     purchase_button = InlineKeyboardButton(text='К покупкам', callback_data='purchases')
+    show_cart = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [personal_button],
         [purchase_button],
+        [show_cart],
     ])
 
     return keyboard
@@ -33,7 +35,7 @@ async def personal_account_markup() -> InlineKeyboardMarkup:
     return keyboard
 
 
-async def bought_items_markup(has_next: bool, has_prev: bool) -> InlineKeyboardMarkup:
+async def bought_items_markup(has_next: bool, has_prev: bool, **kwargs) -> InlineKeyboardMarkup:
 
     buttons = []
 

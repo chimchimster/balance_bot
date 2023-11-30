@@ -98,14 +98,16 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
             async with session.begin():
                 stmt_result = await session.execute(
                     select(
+                        Items.id,
                         Items.title,
                         Items.description,
                         Items.price,
                         Brands.title,
-                        Images.path
+                        Images.path,
                     ).select_from(Orders)
                     .join(OrderItem)
                     .join(Items)
+                    .join(ItemMeta)
                     .join(Brands)
                     .join(ItemsImages)
                     .join(Images)

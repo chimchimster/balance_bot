@@ -1,4 +1,5 @@
 from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 
@@ -20,4 +21,14 @@ class RedisSerializer:
 
         if isinstance(value, Decimal):
             return float(value)
-        ...
+        if isinstance(value, str):
+            return str(value)
+        if isinstance(value, list):
+            serialized_value = []
+            for v in value:
+                new_val = await RedisSerializer.__serialize(v)
+                serialized_value.append(new_val)
+
+            return serialized_value
+        if isinstance(value, Enum):
+            return value.name

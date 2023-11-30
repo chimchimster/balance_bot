@@ -56,10 +56,32 @@ async def items_markup(has_next: bool, has_prev: bool, **kwargs) -> InlineKeyboa
 
     delete_from_cart_button = InlineKeyboardButton(text='Убрать из корзины', callback_data='delete_from_cart')
 
+    current_filter = kwargs.get('current_filter')
+
+    filter_title = ''
+    if current_filter:
+
+        for key, value in current_filter.items():
+            if value != 'Без фильтра':
+                if key == 'size':
+                    filter_title += 'размер: ' + value.split(',')[-1]
+                if key == 'sex':
+                    filter_title += 'пол: ' + ('М' if value.split('.')[-1].lower().startswith('m') else 'Ж') + ', '
+                if key == 'color':
+                    filter_title += 'цвет: ' + value.split(',')[-1] + ', '
+
+    if filter_title == '':
+        filter_title = 'без фильтров'
+    else:
+        filter_title = filter_title.lower()
+
+    current_filter_button = InlineKeyboardButton(text=filter_title, callback_data='purchases')
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
             pagination_buttons,
             [add_to_cart_button],
             [delete_from_cart_button] if update_cart > 0 else [],
+            [current_filter_button],
             [back_to_main_menu],
         ]
     )

@@ -19,9 +19,15 @@ class Cart:
 
         return -1
 
-    async def remove_item(self, item: Item) -> Optional[int]:
+    async def remove_item(self, item: dict) -> Optional[int]:
         try:
-            self._items.remove(item)
+
+            item_id = item.get('id')
+
+            for item in self._items:
+                if item.get('id') == item_id:
+                    self._items.remove(item)
+                    break
         except ValueError:
             return -1
 

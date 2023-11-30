@@ -203,6 +203,7 @@ async def confirm_registration(message: Message, state: FSMContext) -> Optional[
         await state.update_data({'last_bot_msg_id': bot_message.message_id})
         return
 
+
 @router.message(
     RegState.CONFIRM_REGISTRATION,
     F.text == 'Нет',

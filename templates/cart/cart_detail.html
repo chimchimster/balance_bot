@@ -1,5 +1,9 @@
-<code>{% for item in cart %}
-    №{{ loop.index }}. {{ item.title }} {{ item.color }} {{ item.size }}
+<code>Ваша корзина:
+{% if cart %}{% for item in cart %}
+№{{ loop.index }}. {{ item.title }}
+{{ item.color }} {{ item.size }} {{ item.sex }} {{ item.brand }}
 {% endfor %}
-    {{ total.price }}₽
+{% else %}
+Ваша корзина пуста!
+{% endif %}
 </code>
