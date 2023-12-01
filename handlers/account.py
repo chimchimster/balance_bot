@@ -9,7 +9,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
 
 from database.models import *
-from keyboards.inline.app import personal_account_markup, bought_items_markup
+from keyboards.inline.app import personal_account_markup, bought_items_markup, back_to_account_markup
 from callback_data.callback_data import PersonalOrdersCallbackData
 from database.models.exceptions.models_exc import UserNotFound
 from states.states import SetNewAddressState
@@ -28,6 +28,13 @@ router = Router()
 )
 async def personal_account_handler(query: CallbackQuery, state: FSMContext):
     tg_id = query.message.chat.id
+
+    data = await state.get_data()
+
+    last_bot_msg_id = data.get('last_bot_msg_id')
+
+    if last_bot_msg_id is not None:
+        await query.message.chat.delete_message(message_id=last_bot_msg_id)
 
     try:
         async with AsyncSessionLocal() as session:
@@ -88,6 +95,10 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
 
     tg_id = query.message.chat.id
     user_id = data.get('user_id')
+
+    last_bot_msg_id = data.get('last_bot_msg_id')
+    if last_bot_msg_id is not None:
+        await query.message.chat.delete_message(message_id=last_bot_msg_id)
 
     if user_id is None:
         bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
@@ -165,6 +176,10 @@ async def show_addresses_handler(query: CallbackQuery, state: FSMContext):
 
     user_id = data.get('user_id')
 
+    last_bot_msg_id = data.get('last_bot_msg_id')
+    if last_bot_msg_id is not None:
+        await query.message.chat.delete_message(message_id=last_bot_msg_id)
+
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -180,7 +195,9 @@ async def show_addresses_handler(query: CallbackQuery, state: FSMContext):
 
                 data = [AddressItem(*args) for args in stmt_result.fetchall()]
                 html = await render_template('account/personal_addresses.html', addresses=data)
-                await query.message.answer(text=html)
+                bot_message = await query.message.answer(text=html, reply_markup=await back_to_account_markup())
+                await state.update_data({'last_bot_msg_id': bot_message.message_id})
+
     except sqlalchemy.exc.SQLAlchemyError:
         bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
         await query.message.chat.delete_message(message_id=bot_message.message_id)
@@ -193,10 +210,10 @@ async def show_addresses_handler(query: CallbackQuery, state: FSMContext):
 async def add_address_handler(query: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
-    bot_last_msg_id = data.get('bot_last_msg_id')
+    last_bot_msg_id = data.get('last_bot_msg_id')
 
-    if bot_last_msg_id is not None:
-        await query.message.chat.delete_message(message_id=bot_last_msg_id)
+    if last_bot_msg_id is not None:
+        await query.message.chat.delete_message(message_id=last_bot_msg_id)
 
     await state.set_state(SetNewAddressState.REGION)
 

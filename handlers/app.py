@@ -17,14 +17,26 @@ async def send_main_manu(obj: Union[Message, CallbackQuery], state: FSMContext):
 
     old_data = await state.get_data()
 
-    await state.set_data({key: value for key, value in old_data.items() if key == 'in_cart'})
+    last_bot_msg_id = old_data.get('last_bot_msg_id')
+
+    await state.set_data({key: value for key, value in old_data.items() if key in ('in_cart', 'current_address', 'current_address_id')})
 
     html = await render_template('menu/main_menu.html')
 
     if isinstance(obj, Message):
-        await obj.answer(text=html, reply_markup=await main_menu_markup())
+
+        if last_bot_msg_id is not None:
+            await obj.chat.delete_message(message_id=last_bot_msg_id)
+
+        bot_message = await obj.answer(text=html, reply_markup=await main_menu_markup())
+        await state.update_data({'last_bot_msg_id': bot_message.message_id})
     else:
-        await obj.message.answer(text=html, reply_markup=await main_menu_markup())
+
+        if last_bot_msg_id is not None:
+            await obj.message.chat.delete_message(message_id=last_bot_msg_id)
+
+        bot_message = await obj.message.answer(text=html, reply_markup=await main_menu_markup())
+        await state.update_data({'last_bot_msg_id': bot_message.message_id})
 
 
 @router.message(
@@ -42,5 +54,13 @@ async def main_menu_callback_handler(query: CallbackQuery, state: FSMContext):
 
 
 @router.message()
-async def handle_404(message: Message):
-    await message.answer('<code>Запрашиваемые вами данные не найдены, пожалуйста, обратитесь в поддержку!</code>')
+async def handle_404(message: Message, state: FSMContext):
+
+    data = await state.get_data()
+
+    last_bot_msg_id = data.get('last_bot_msg_id')
+    if last_bot_msg_id is not None:
+        await message.chat.delete_message(message_id=last_bot_msg_id)
+    bot_message = await message.answer('<code>Запрашиваемые вами данные не найдены, пожалуйста, обратитесь в поддержку!</code>')
+
+    await state.update_data({'last_bot_msg_id': bot_message.message_id})

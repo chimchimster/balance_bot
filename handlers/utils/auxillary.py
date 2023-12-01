@@ -3,6 +3,7 @@ import itertools
 from typing import Optional, Any
 from bisect import bisect_left
 
+import aiogram.exceptions
 import sqlalchemy.exc
 
 from aiogram.fsm.context import FSMContext
@@ -152,11 +153,17 @@ async def paginate(
     last_bot_msg_id = data.get('last_bot_msg_id')
     last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
 
-    if last_bot_msg_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_id)
+    try:
+        if last_bot_msg_id is not None:
+            await query.message.chat.delete_message(message_id=last_bot_msg_id)
+    except aiogram.exceptions.TelegramBadRequest:
+        ...
 
-    if last_bot_msg_photo_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_photo_id)
+    try:
+        if last_bot_msg_photo_id is not None:
+            await query.message.chat.delete_message(message_id=last_bot_msg_photo_id)
+    except aiogram.exceptions.TelegramBadRequest:
+        ...
 
     tg_id = query.message.chat.id
 

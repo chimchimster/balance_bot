@@ -23,13 +23,16 @@ async def personal_account_markup() -> InlineKeyboardMarkup:
     orders_button = InlineKeyboardButton(text='Мои заказы', callback_data='orders')
     show_addresses = InlineKeyboardButton(text='Мои адреса', callback_data='show_addresses')
     add_address = InlineKeyboardButton(text='Добавить адрес доставки', callback_data='add_address')
-    return_to_main_menu = InlineKeyboardButton(text='Вернуться на главную', callback_data='back_to_main_menu')
+
+    show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
+    back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [orders_button],
         [show_addresses],
         [add_address],
-        [return_to_main_menu],
+        [show_cart_button],
+        [back_to_main_menu_button],
     ])
 
     return keyboard
@@ -39,8 +42,6 @@ async def bought_items_markup(has_next: bool, has_prev: bool, **kwargs) -> Inlin
 
     buttons = []
 
-    back_to_main_menu = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
-
     if has_prev:
         prev_button = InlineKeyboardButton(text='Назад', callback_data=PersonalOrdersCallbackData(flag=False).pack())
         buttons.append(prev_button)
@@ -49,9 +50,31 @@ async def bought_items_markup(has_next: bool, has_prev: bool, **kwargs) -> Inlin
         next_button = InlineKeyboardButton(text='Вперед', callback_data=PersonalOrdersCallbackData(flag=True).pack())
         buttons.append(next_button)
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons, [back_to_main_menu]])
+    show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
+    back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            buttons,
+            [show_cart_button],
+            [back_to_main_menu_button]
+        ]
+    )
 
     return keyboard
 
+
+async def back_to_account_markup() -> InlineKeyboardMarkup:
+
+    back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
+    back_to_personal_account_button = InlineKeyboardButton(text='Вернуться в личный кабинет', callback_data='personal_account')
+    show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [back_to_personal_account_button],
+        [show_cart_button],
+        [back_to_main_menu_button],
+    ])
+
+    return keyboard
 
 __all__ = ['main_menu_markup', 'bought_items_markup',]

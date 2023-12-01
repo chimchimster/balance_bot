@@ -24,10 +24,15 @@ async def get_search_filter_keyboard(
     color_button = InlineKeyboardButton(text='Любой цвет' if not color else color, callback_data='choose_color')
     apply_filters_button = InlineKeyboardButton(text='Применить фильтры', callback_data='apply_filters')
 
+    show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
+    back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [brand_button, size_button],
         [sex_button, color_button],
         [apply_filters_button],
+        [show_cart_button],
+        [back_to_main_menu_button],
     ])
 
     return keyboard
@@ -37,7 +42,7 @@ async def items_markup(has_next: bool, has_prev: bool, **kwargs) -> InlineKeyboa
 
     pagination_buttons = []
 
-    back_to_main_menu = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
+    back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
 
     if has_prev:
         prev_button = InlineKeyboardButton(text='Назад', callback_data=AvailableItemsCallbackData(flag=False).pack())
@@ -77,12 +82,15 @@ async def items_markup(has_next: bool, has_prev: bool, **kwargs) -> InlineKeyboa
 
     current_filter_button = InlineKeyboardButton(text=filter_title, callback_data='purchases')
 
+    show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
             pagination_buttons,
             [add_to_cart_button],
             [delete_from_cart_button] if update_cart > 0 else [],
             [current_filter_button],
-            [back_to_main_menu],
+            [show_cart_button],
+            [back_to_main_menu_button],
         ]
     )
 
