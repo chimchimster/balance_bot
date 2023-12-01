@@ -32,7 +32,7 @@ class Cart:
             return -1
 
     async def calculate_sum_of_items(self) -> int:
-        return sum(item.price for item in self._items)
+        return round(sum(item.get('price', 0) for item in self._items), 2)
 
     async def clean_up(self):
         self._items.clear()

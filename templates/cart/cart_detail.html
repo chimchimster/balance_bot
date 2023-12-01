@@ -1,8 +1,17 @@
-<code>Ваша корзина:
-{% if cart %}{% for item in cart %}
+<code>{% if cart %}Ваша корзина:
+______________________
+{% for item in cart %}
 №{{ loop.index }}. {{ item.title }}
-{{ item.color }} {{ item.size }} {{ item.sex }} {{ item.brand }}
+Бренд: {{ item.brand_name }}
+Цвет: {{ item.color|no_filter }}
+Размер: {{ item.size|no_filter }}
+Пол: {{ item.sex|no_filter }}
+Цена: {{ item.price }}₽
+{% if not loop.last %}
+______________________
+{% endif %}
 {% endfor %}
+На сумму: {{ total_price }}₽
 {% else %}
 Ваша корзина пуста!
 {% endif %}

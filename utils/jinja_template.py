@@ -1,6 +1,7 @@
 import pathlib
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from .jinja_template_filters import no_filters
 
 
 template_env = Environment(loader=FileSystemLoader(
@@ -9,6 +10,8 @@ template_env = Environment(loader=FileSystemLoader(
     autoescape=select_autoescape(['html']),
     enable_async=True,
 )
+
+template_env.filters['no_filter'] = no_filters
 
 
 async def render_template(template_name: str, **context) -> str:
