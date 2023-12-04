@@ -11,6 +11,7 @@ from database.models.schemas.auth import Addresses, Users
 from database.session import AsyncSessionLocal
 from utils.jinja_template import render_template
 from keyboards.inline.cart import get_cart_keyboard
+from handlers.utils.auxillary import delete_prev_messages
 from bot import bot as balance_bot
 
 router = Router()
@@ -25,9 +26,9 @@ async def show_cart_handler(query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
     last_bot_msg_id = data.get('last_bot_msg_id')
+    last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
 
-    if last_bot_msg_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_id)
+    await delete_prev_messages(query, last_bot_msg_id, last_bot_msg_photo_id)
 
     addresses = data.get('shipping_addresses')
 

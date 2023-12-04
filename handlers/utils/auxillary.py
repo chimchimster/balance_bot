@@ -1,6 +1,7 @@
+import functools
 import re
 import itertools
-from typing import Optional, Any
+from typing import Optional, Any, Union, Coroutine, Callable
 from bisect import bisect_left
 
 import aiogram.exceptions
@@ -150,21 +151,6 @@ async def paginate(
 ):
     data = await state.get_data()
 
-    last_bot_msg_id = data.get('last_bot_msg_id')
-    last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
-
-    try:
-        if last_bot_msg_id is not None:
-            await query.message.chat.delete_message(message_id=last_bot_msg_id)
-    except aiogram.exceptions.TelegramBadRequest:
-        ...
-
-    try:
-        if last_bot_msg_photo_id is not None:
-            await query.message.chat.delete_message(message_id=last_bot_msg_photo_id)
-    except aiogram.exceptions.TelegramBadRequest:
-        ...
-
     tg_id = query.message.chat.id
 
     async with paginator_storage:
@@ -220,7 +206,63 @@ async def paginate(
         text=html,
         reply_markup=await reply_coroutine(has_next, has_prev, update_cart=update_cart, current_filter=current_filter),
     )
-    await state.update_data({
-        'last_bot_msg_id': bot_message.message_id,
-        'last_bot_msg_photo_id': bot_message_photo.message_id
-    })
+    await state.update_data(
+        {
+            'last_bot_msg_photo_id': bot_message_photo.message_id,
+        }
+    )
+
+    return bot_message
+
+
+async def delete_prev_messages(
+        query_or_message: Union[CallbackQuery, Message],
+        previous_msg_id: int,
+        previous_msg_photo_id: int,
+) -> None:
+
+    if isinstance(query_or_message, Message):
+        obj = query_or_message
+    elif isinstance(query_or_message, CallbackQuery):
+        obj = query_or_message.message
+    else:
+        raise ValueError
+
+    # Try to delete text message
+    if previous_msg_id is not None:
+        try:
+            await obj.chat.delete_message(message_id=previous_msg_id)
+        except aiogram.exceptions.TelegramBadRequest:
+            ...
+
+    # Try to delete message with photo
+    if previous_msg_photo_id is not None:
+        try:
+            await obj.chat.delete_message(message_id=previous_msg_photo_id)
+        except aiogram.exceptions.TelegramBadRequest:
+            ...
+
+
+def delete_prev_messages_and_update_state(coro: Callable):
+
+    @functools.wraps(coro)
+    async def wrapper(query_or_message: Union[CallbackQuery, Message], state: FSMContext, *args, **kwargs):
+
+        data = await state.get_data()
+
+        last_bot_msg_id = data.get('last_bot_msg_id')
+        last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
+
+        await delete_prev_messages(query_or_message, last_bot_msg_id, last_bot_msg_photo_id)
+
+        result_coro = await coro(query_or_message, state, *args, **kwargs)
+
+        await state.update_data(
+            {
+                'last_bot_msg_id': result_coro.message_id,
+            }
+        )
+
+        return result_coro
+
+    return wrapper

@@ -1,6 +1,7 @@
 import json
 from typing import Optional, Dict
 
+import aiogram.exceptions
 import sqlalchemy.exc
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
@@ -15,7 +16,7 @@ from database.models import *
 from database.session import AsyncSessionLocal
 from handlers.utils.named_entities import Item
 from keyboards.inline.purchases import get_search_filter_keyboard, items_markup
-from handlers.utils.auxillary import filter_products, paginate
+from handlers.utils.auxillary import filter_products, paginate, delete_prev_messages, delete_prev_messages_and_update_state
 from balance_bot.utils.paginator import Paginator
 from mem_storage import paginator_storage
 from balance_bot.bot import bot as balance_bot
@@ -26,6 +27,7 @@ router = Router()
 @router.callback_query(
     F.data == 'purchases'
 )
+@delete_prev_messages_and_update_state
 async def search_filter_handler(query: CallbackQuery, state: FSMContext):
 
     old_data = await state.get_data()
@@ -34,8 +36,6 @@ async def search_filter_handler(query: CallbackQuery, state: FSMContext):
 
     bot_message = await query.message.answer(text='<code>Выберте подходящие фильтры:</code>',
                                              reply_markup=await get_search_filter_keyboard())
-
-    await state.update_data({'last_bot_msg_id': bot_message.message_id})
 
     return bot_message
 
@@ -138,12 +138,13 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
         ]
     )
 )
+@delete_prev_messages_and_update_state
 async def paginate_over_items(
         query: CallbackQuery,
         state: FSMContext
 ):
 
-    await paginate(
+    return await paginate(
         query,
         state,
         Item,
