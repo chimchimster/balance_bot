@@ -1,6 +1,6 @@
 import re
+from typing import Awaitable
 
-import aiogram.exceptions
 import sqlalchemy.exc
 from aiogram.fsm.context import FSMContext
 
@@ -8,16 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.sql.functions import count, func
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
 
 from database.models import *
-from keyboards.inline.app import personal_account_markup, bought_items_markup, back_to_account_markup
+from keyboards.inline.app import personal_account_markup, bought_items_markup, back_to_account_markup, main_menu_markup
 from callback_data.callback_data import PersonalOrdersCallbackData
 from database.models.exceptions.models_exc import UserNotFound
 from states.states import SetNewAddressState
 from database.session import AsyncSessionLocal
 from handlers.utils.named_entities import Item, AddressItem
-from handlers.utils.auxillary import paginate
+from handlers.utils.auxillary import paginate, delete_prev_messages_and_update_state
 from utils.jinja_template import render_template
 from utils.paginator import Paginator
 from mem_storage import paginator_storage
@@ -28,15 +28,10 @@ router = Router()
 @router.callback_query(
     F.data == 'personal_account',
 )
+@delete_prev_messages_and_update_state
 async def personal_account_handler(query: CallbackQuery, state: FSMContext):
+
     tg_id = query.message.chat.id
-
-    data = await state.get_data()
-
-    last_bot_msg_id = data.get('last_bot_msg_id')
-
-    if last_bot_msg_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_id)
 
     try:
         async with AsyncSessionLocal() as session:
@@ -66,9 +61,7 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                         raise UserNotFound
                     await state.update_data({'user_id': user_id, 'first_name': first_name, 'last_name': last_name})
                 except UserNotFound:
-                    bot_message = await query.message.answer('<code>Пользователь не найден</code>')
-                    await state.update_data({'last_bot_msg_id': bot_message.message_id})
-                    return bot_message
+                    return await query.message.answer('<code>Пользователь не найден</code>')
                 else:
                     html = await render_template(
                         'account/personal_account.html',
@@ -78,19 +71,16 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                         orders_sum=total_orders_price,
                     )
 
-                    bot_message = await query.message.answer(text=html, reply_markup=await personal_account_markup())
-                    await state.update_data({'last_bot_msg_id': bot_message.message_id})
-                    return bot_message
+                    return await query.message.answer(text=html, reply_markup=await personal_account_markup())
 
     except sqlalchemy.exc.SQLAlchemyError:
-        bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
-        await state.update_data({'last_bot_msg_id': bot_message.message_id})
-        return bot_message
+        return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
 
 
 @router.callback_query(
     F.data == 'orders',
 )
+@delete_prev_messages_and_update_state
 async def all_orders_handler(query: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
@@ -98,14 +88,8 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
     tg_id = query.message.chat.id
     user_id = data.get('user_id')
 
-    last_bot_msg_id = data.get('last_bot_msg_id')
-    if last_bot_msg_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_id)
-
     if user_id is None:
-        bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
-        await state.update_data({'last_bot_msg_id': bot_message.message_id})
-        return bot_message
+        return await query.message.answer('<code>Упс, что-то пошло не так...</code>')
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -135,14 +119,12 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
                     paginator_storage[tg_id] = paginator
 
                 if data:
-                    await paginate_over_bought_items(query, state)
+                    return await paginate_over_bought_items(query, state)
                 else:
                     # empty orders list template rendering
                     pass
     except sqlalchemy.exc.SQLAlchemyError:
-        bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
-        await query.message.chat.delete_message(message_id=bot_message.message_id)
-        return bot_message
+        return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
 
 
 @router.callback_query(
@@ -153,12 +135,13 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
         ]
     )
 )
+@delete_prev_messages_and_update_state
 async def paginate_over_bought_items(
         query: CallbackQuery,
         state: FSMContext,
-):
+) -> Awaitable:
 
-    await paginate(
+    return await paginate(
         query,
         state,
         Item,
@@ -173,25 +156,14 @@ async def paginate_over_bought_items(
 @router.callback_query(
     F.data == 'show_addresses',
 )
-async def show_addresses_handler(query: CallbackQuery, state: FSMContext):
+@delete_prev_messages_and_update_state
+async def show_addresses_handler(
+        query: CallbackQuery,
+        state: FSMContext,
+) -> Message:
     data = await state.get_data()
 
     user_id = data.get('user_id')
-
-    last_bot_msg_id = data.get('last_bot_msg_id')
-    last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
-
-    if last_bot_msg_id is not None:
-        try:
-            await query.message.chat.delete_message(message_id=last_bot_msg_id)
-        except aiogram.exceptions.TelegramBadRequest:
-            ...
-
-    if last_bot_msg_photo_id is not None:
-        try:
-            await query.message.chat.delete_message(message_id=last_bot_msg_photo_id)
-        except aiogram.exceptions.TelegramBadRequest:
-            ...
 
     try:
         async with AsyncSessionLocal() as session:
@@ -208,25 +180,20 @@ async def show_addresses_handler(query: CallbackQuery, state: FSMContext):
 
                 data = [AddressItem(*args) for args in stmt_result.fetchall()]
                 html = await render_template('account/personal_addresses.html', addresses=data)
-                bot_message = await query.message.answer(text=html, reply_markup=await back_to_account_markup())
-                await state.update_data({'last_bot_msg_id': bot_message.message_id})
+                return await query.message.answer(text=html, reply_markup=await back_to_account_markup())
 
     except sqlalchemy.exc.SQLAlchemyError:
-        bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
-        await query.message.chat.delete_message(message_id=bot_message.message_id)
-        return bot_message
+        return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
 
 
 @router.callback_query(
     F.data == 'add_address',
 )
-async def add_address_handler(query: CallbackQuery, state: FSMContext):
-
-    data = await state.get_data()
-    last_bot_msg_id = data.get('last_bot_msg_id')
-
-    if last_bot_msg_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_id)
+@delete_prev_messages_and_update_state
+async def add_address_handler(
+        query: CallbackQuery,
+        state: FSMContext
+) -> Message:
 
     await state.set_state(SetNewAddressState.REGION)
 
@@ -236,122 +203,94 @@ async def add_address_handler(query: CallbackQuery, state: FSMContext):
     keyboard = ReplyKeyboardMarkup(keyboard=[[button_ru, button_kz]])
     keyboard.resize_keyboard = True
 
-    bot_message = await query.message.answer(text='Выберите регион', reply_markup=keyboard)
-    await state.update_data({'bot_last_msg_id': bot_message.message_id})
+    return await query.message.answer(text='Выберите регион', reply_markup=keyboard)
 
 
 @router.message(
     F.text.lower().in_(['ru', 'kz']),
     SetNewAddressState.REGION,
 )
+@delete_prev_messages_and_update_state
 async def add_region_handler(message: Message, state: FSMContext):
 
-    data = await state.get_data()
-    bot_last_msg_id = data.get('bot_last_msg_id')
-
-    if bot_last_msg_id is not None:
-        await message.chat.delete_message(message_id=bot_last_msg_id)
+    await message.chat.delete_message(message_id=message.message_id)
 
     user_choice = message.text.upper()
     await state.update_data({'region': user_choice})
     await state.set_state(SetNewAddressState.CITY)
-    bot_message = await message.answer(text='<code>Введите название города:</code>')
-    await state.update_data({'bot_last_msg_id': bot_message.message_id})
+    return await message.answer(text='<code>Введите название города:</code>')
 
 
 @router.message(
     SetNewAddressState.CITY,
 )
-async def add_city_handler(message: Message, state: FSMContext):
+@delete_prev_messages_and_update_state
+async def add_city_handler(message: Message, state: FSMContext) -> Message:
 
-    data = await state.get_data()
-    bot_last_msg_id = data.get('bot_last_msg_id')
-
-    if bot_last_msg_id is not None:
-        await message.chat.delete_message(message_id=bot_last_msg_id)
+    await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text
     if not re.match(r'[А-Яа-я\s]{5,50}', user_wrote):
-        bot_message = await message.answer(
+        return await message.answer(
             text='<code>Название города не может быть меньше 5-ти символов и превышать 50 символов.</code>'
         )
-        await state.update_data({'bot_last_msg_id': bot_message.message_id})
-        return
 
     await state.update_data({'city': user_wrote})
     await state.set_state(SetNewAddressState.STREET)
-    bot_message = await message.answer(text='<code>Введите название улицы:</code>')
-    await state.update_data({'bot_last_msg_id': bot_message.message_id})
+    return await message.answer(text='<code>Введите название улицы:</code>')
 
 
 @router.message(
     SetNewAddressState.STREET,
 )
-async def add_street_handler(message: Message, state: FSMContext):
+@delete_prev_messages_and_update_state
+async def add_street_handler(message: Message, state: FSMContext) -> Message:
 
-    data = await state.get_data()
-    bot_last_msg_id = data.get('bot_last_msg_id')
-
-    if bot_last_msg_id is not None:
-        await message.chat.delete_message(message_id=bot_last_msg_id)
+    await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text
     if not re.match(r'[А-Яа-я\s]{5,255}', user_wrote):
-        bot_message = await message.answer(
+        return await message.answer(
             text='<code>Название улицы не может быть меньше 5-ти символов и превышать 255 символов.</code>'
         )
-        await state.update_data({'bot_last_msg_id': bot_message.message_id})
-        return
 
     await state.update_data({'street': user_wrote})
     await state.set_state(SetNewAddressState.APARTMENT)
-    bot_message = await message.answer(text='<code>Введите дом и квартиру в формате дом-квартира.</code>')
-    await state.update_data({'bot_last_msg_id': bot_message.message_id})
+    return await message.answer(text='<code>Введите дом и квартиру в формате дом-квартира.</code>')
 
 
 @router.message(
     SetNewAddressState.APARTMENT,
 )
-async def add_apartment_handler(message: Message, state: FSMContext):
+@delete_prev_messages_and_update_state
+async def add_apartment_handler(message: Message, state: FSMContext) -> Message:
 
-    data = await state.get_data()
-    bot_last_msg_id = data.get('bot_last_msg_id')
-
-    if bot_last_msg_id is not None:
-        await message.chat.delete_message(message_id=bot_last_msg_id)
+    await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text
     if not re.match(r'[А-Яа-я\d]{1,10}', user_wrote):
-        bot_message = message.answer(
+        return await message.answer(
             text='<code>Вы ввели менее одного и более 10 символов.</code>'
         )
-        await state.update_data({'bot_last_msg_id': bot_message.message_id})
-        return
 
     await state.update_data({'apartment': user_wrote})
     await state.set_state(SetNewAddressState.PHONE)
-    bot_message = await message.answer(text='<code>Введите номер телефона в формате +79999999999:</code>')
-    await state.update_data({'bot_last_msg_id': bot_message.message_id})
+    return await message.answer(text='<code>Введите номер телефона в формате +79999999999:</code>')
 
 
 @router.message(
     SetNewAddressState.PHONE,
 )
+@delete_prev_messages_and_update_state
 async def add_phone_handler(message: Message, state: FSMContext):
 
-    data = await state.get_data()
-    bot_last_msg_id = data.get('bot_last_msg_id')
-
-    if bot_last_msg_id is not None:
-        await message.chat.delete_message(message_id=bot_last_msg_id)
+    await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text
     if not re.match(r'^(\+7|8)\d{7,10}$', user_wrote):
-        bot_message = await message.answer(
+        return await message.answer(
             text='<code>Допустимый формат номера телефона +79999999999.</code>'
         )
-        await state.update_data({'bot_last_msg_id': bot_message.message_id})
-        return
 
     await state.update_data({'phone': user_wrote})
 
@@ -378,10 +317,7 @@ async def add_phone_handler(message: Message, state: FSMContext):
                 )
                 await session.commit()
 
-                bot_message = await message.answer('<code>Адрес успешно добавлен!</code>')
-                await state.update_data({'bot_last_msg_id': bot_message.message_id})
-                return bot_message
+                return await message.answer('<code>Адрес успешно добавлен!</code>', reply_markup=await personal_account_markup())
+
     except sqlalchemy.exc.SQLAlchemyError:
-        bot_message = await message.answer('<code>Упс, что-то пошло не так...</code>')
-        await message.chat.delete_message(message_id=bot_message.message_id)
-        return bot_message
+        return await message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())

@@ -21,3 +21,7 @@ class SetNewAddressState(StatesGroup):
     STREET = State()
     APARTMENT = State()
     PHONE = State()
+
+
+class PaymentsState(StatesGroup):
+    START_PAYMENT = State()

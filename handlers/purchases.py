@@ -34,10 +34,8 @@ async def search_filter_handler(query: CallbackQuery, state: FSMContext):
 
     await state.set_data({key: value for key, value in old_data.items() if key == 'in_cart'})
 
-    bot_message = await query.message.answer(text='<code>Выберте подходящие фильтры:</code>',
-                                             reply_markup=await get_search_filter_keyboard())
-
-    return bot_message
+    return await query.message.answer(text='<code>Выберте подходящие фильтры:</code>',
+                                      reply_markup=await get_search_filter_keyboard())
 
 
 @router.callback_query(
@@ -71,7 +69,9 @@ async def choose_size_handler(query: CallbackQuery, state: FSMContext):
 @router.callback_query(
     F.data == 'apply_filters',
 )
-async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Optional[Message]:
+@delete_prev_messages_and_update_state
+async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Message:
+
     tg_id = query.message.chat.id
 
     data = await state.get_data()
@@ -120,14 +120,12 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Opti
                     paginator_storage[tg_id] = paginator
 
                 if data:
-                    await paginate_over_items(query, state)
+                    return await paginate_over_items(query, state)
                 else:
                     # message that there is no such items and show filters again
                     pass
     except sqlalchemy.exc.SQLAlchemyError:
-        bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
-        await state.update_data({'last_bot_msg_id': bot_message.message_id})
-        return bot_message
+        return await query.message.answer('<code>Упс, что-то пошло не так...</code>')
 
 
 @router.callback_query(

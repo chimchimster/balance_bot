@@ -11,7 +11,7 @@ from database.models.schemas.auth import Addresses, Users
 from database.session import AsyncSessionLocal
 from utils.jinja_template import render_template
 from keyboards.inline.cart import get_cart_keyboard
-from handlers.utils.auxillary import delete_prev_messages
+from handlers.utils.auxillary import delete_prev_messages_and_update_state
 from bot import bot as balance_bot
 
 router = Router()
@@ -20,15 +20,11 @@ router = Router()
 @router.callback_query(
     F.data == 'show_cart',
 )
+@delete_prev_messages_and_update_state
 async def show_cart_handler(query: CallbackQuery, state: FSMContext):
 
     tg_id = query.message.chat.id
     data = await state.get_data()
-
-    last_bot_msg_id = data.get('last_bot_msg_id')
-    last_bot_msg_photo_id = data.get('last_bot_msg_photo_id')
-
-    await delete_prev_messages(query, last_bot_msg_id, last_bot_msg_photo_id)
 
     addresses = data.get('shipping_addresses')
 
@@ -54,8 +50,7 @@ async def show_cart_handler(query: CallbackQuery, state: FSMContext):
                     await state.update_data({'shipping_addresses': addresses})
 
         except sqlalchemy.exc.SQLAlchemyError:
-            bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
-            await state.update_data({'last_bot_msg_id': bot_message.message_id})
+            return await query.message.answer('<code>Упс, что-то пошло не так...</code>')
 
     cart_items = data.get('in_cart')
 
@@ -76,24 +71,22 @@ async def show_cart_handler(query: CallbackQuery, state: FSMContext):
         current_shipping_address=', '.join(current_address) if current_address != 'не выбран' else 'не выбран',
     )
 
-    bot_message = await query.message.answer(text=html, reply_markup=await get_cart_keyboard(addresses))
-    await state.update_data({'last_bot_msg_id': bot_message.message_id})
+    return await query.message.answer(text=html, reply_markup=await get_cart_keyboard(
+            addresses,
+            cart_has_items=True if items else False,
+        )
+    )
 
 
 @router.callback_query(
     F.data == 'clean_cart_up',
 )
+@delete_prev_messages_and_update_state
 async def clean_cart_up(query: CallbackQuery, state: FSMContext):
-
-    data = await state.get_data()
-    last_bot_msg_id = data.get('last_bot_msg_id')
-
-    if last_bot_msg_id is not None:
-        await query.message.chat.delete_message(message_id=last_bot_msg_id)
 
     await state.update_data({'in_cart': []})
 
-    await show_cart_handler(query, state)
+    return await show_cart_handler(query, state)
 
 
 @router.callback_query(

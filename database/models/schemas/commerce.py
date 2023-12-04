@@ -137,8 +137,15 @@ class OrderItem(Base):
         {'schema': 'commerce'} if not DEBUG else None,
     )
 
+    class Gender(enum.Enum):
+        male = 'male'
+        female = 'female'
+
     order_id = Column(Integer, ForeignKey('commerce.orders.id'), primary_key=True)
     item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
+    size = Column(DECIMAL(4, 2))
+    color = Column(String(15))
+    sex = Column(Enum(Gender, schema='commerce'))
 
 
 class Orders(Base):

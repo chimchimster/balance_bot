@@ -212,7 +212,7 @@ async def paginate(
         }
     )
 
-    return bot_message
+    return bot_message, bot_message_photo
 
 
 async def delete_prev_messages(
@@ -257,11 +257,23 @@ def delete_prev_messages_and_update_state(coro: Callable):
 
         result_coro = await coro(query_or_message, state, *args, **kwargs)
 
-        await state.update_data(
-            {
-                'last_bot_msg_id': result_coro.message_id,
-            }
-        )
+        if isinstance(result_coro, tuple) and len(result_coro) == 2:
+
+            await state.update_data(
+                {
+                    'last_bot_msg_id': result_coro[0].message_id,
+                    'last_bot_msg_photo_id': result_coro[-1].message_id,
+                }
+            )
+        elif isinstance(result_coro, (CallbackQuery, Message)):
+
+            await state.update_data(
+                {
+                    'last_bot_msg_id': result_coro.message_id,
+                }
+            )
+        else:
+            raise ValueError
 
         return result_coro
 
