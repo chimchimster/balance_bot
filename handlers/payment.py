@@ -122,11 +122,15 @@ async def payment_success_handler(message: Message, state: FSMContext):
         async with AsyncSessionLocal() as session:
             async with session.begin():
 
-                update_stmt = update(Orders).where(
-                    Orders.user_id == user_id, Orders.id == order_id
-                ).values(paid=True)
+                if user_id and order_id:
+                    update_stmt = update(Orders).where(
+                        Orders.user_id == user_id, Orders.id == order_id
+                    ).values(paid=True)
 
-                await session.execute(update_stmt)
+                    await session.execute(update_stmt)
+                else:
+                    raise sqlalchemy.exc.SQLAlchemyError
+
     except sqlalchemy.exc.SQLAlchemyError:
         # Нужно придумать как поступать в данной ситуации.
         # Идея: возможно нужно пользователю выдавать айди заказа с которым он мог бы обратиться в поддержку.
