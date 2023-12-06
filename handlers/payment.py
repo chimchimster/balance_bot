@@ -1,9 +1,10 @@
+import json
 import aiogram
 import sqlalchemy.exc
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, PreCheckoutQuery, ShippingQuery, Message, successful_payment
-from sqlalchemy import insert
+from aiogram.types import CallbackQuery, PreCheckoutQuery, ShippingQuery, Message
+from sqlalchemy import insert, update
 
 from bot import bot as balance_bot
 from balance_bot.cart.cart import CartManager
@@ -76,7 +77,7 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
     except sqlalchemy.exc.SQLAlchemyError:
         return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
 
-    payload = f"{{'user_id': {user_id}, 'order_id': {order_id}}}"
+    payload = f'{{"user_id": {user_id}, "order_id": {order_id}}}'
 
     return await balance_bot.send_invoice(
         query.message.chat.id,
@@ -108,6 +109,29 @@ async def checkout_handler(pre_checkout_query: PreCheckoutQuery):
     )
 
 
-@router.message(PaymentsState.START_PAYMENT, successful_payment.SuccessfulPayment)
+@router.message(F.successful_payment)
 async def payment_success_handler(message: Message, state: FSMContext):
-    await balance_bot.send_message(message.chat.id, 'Спасибо за оплату!')
+
+    payload_str = message.successful_payment.invoice_payload
+    payload_dict = json.loads(payload_str)
+
+    user_id = payload_dict.get('user_id')
+    order_id = payload_dict.get('order_id')
+
+    try:
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+
+                update_stmt = update(Orders).where(
+                    Orders.user_id == user_id, Orders.id == order_id
+                ).values(paid=True)
+
+                await session.execute(update_stmt)
+    except sqlalchemy.exc.SQLAlchemyError:
+        # Нужно придумать как поступать в данной ситуации.
+        # Идея: возможно нужно пользователю выдавать айди заказа с которым он мог бы обратиться в поддержку.
+        ...
+
+    await balance_bot.send_message(message.chat.id, f'Спасибо за оплату заказа №{order_id}!')
+
+

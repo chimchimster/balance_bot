@@ -159,6 +159,7 @@ class Orders(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('auth.users.id' if not DEBUG else 'users.id'))
     date_created = Column(DateTime, default=datetime.utcnow())
+    paid = Column(Boolean, default=False)
 
     users = relationship('Users', back_populates='orders')
     deliveries = relationship('Deliveries', back_populates='orders')
