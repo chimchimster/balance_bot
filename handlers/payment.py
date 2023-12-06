@@ -40,24 +40,26 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
 
                 insert_stmt = insert(Orders).values(user_id=user_id).returning(Orders.id)
 
-                order_id = await session.execute(insert_stmt)
+                result_stmt = await session.execute(insert_stmt)
 
-                # TODO: object cannot be interpreted as an integer
+                order_id = result_stmt.scalar()
 
-                values_to_order_item = [
-                    {
-                        'order_id': order_id,
-                        'item_id': item.get('id'),
-                        'color': item.get('color') if item.get('color') != 'Без фильтра' else None,
-                        'size': item.get('size') if item.get('size') != 'Без фильтра' else None,
-                        'sex': item.get('sex') if item.get('sex') != 'Без фильтра' else None,
-                    }
-                    for item in await cart.get_items if item.get('id') is not None
-                ]
+                if order_id is not None:
 
-                insert_stmt = insert(OrderItem).values(values_to_order_item)
+                    values_to_order_item = [
+                        {
+                            'order_id': order_id,
+                            'item_id': item.get('id'),
+                            'color': item.get('color') if item.get('color') != 'Без фильтра' else None,
+                            'size': item.get('size') if item.get('size') != 'Без фильтра' else None,
+                            'sex': item.get('sex') if item.get('sex') != 'Без фильтра' else None,
+                        }
+                        for item in await cart.get_items if item.get('id') is not None
+                    ]
 
-                await session.execute(insert_stmt)
+                    insert_stmt = insert(OrderItem).values(values_to_order_item)
+
+                    await session.execute(insert_stmt)
     except sqlalchemy.exc.SQLAlchemyError as e:
         print(e)
         return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())

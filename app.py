@@ -20,6 +20,7 @@ from handlers.payment import router as payment_router
 from middlewares.auth import AuthUserMiddleware
 
 from bot import BOT_TOKEN, bot
+from middlewares.cart import CartIsFullFiledMiddleware
 
 SERVER_URL = bot_settings.server_token.get_secret_value()
 WEBHOOK_URL = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={SERVER_URL}'
@@ -38,6 +39,7 @@ def main() -> None:
 
     dp = Dispatcher(storage=RedisStorage(r_con))
     dp.message.outer_middleware(AuthUserMiddleware())
+    dp.callback_query.outer_middleware(CartIsFullFiledMiddleware())
     dp.include_routers(
         auth_router,
         app_router,

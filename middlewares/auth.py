@@ -1,4 +1,4 @@
-from typing import Callable, Awaitable, Dict, Any
+from typing import Callable, Awaitable, Dict, Any, Union
 
 from aiogram import BaseMiddleware
 from aiogram.types import Message
@@ -22,3 +22,9 @@ class AuthUserMiddleware(BaseMiddleware):
             data['auth_state'] = auth_state
 
             return await handler(event, data)
+
+
+
+
+
+
