@@ -278,3 +278,17 @@ def delete_prev_messages_and_update_state(coro: Callable):
         return result_coro
 
     return wrapper
+
+
+async def group_order(order_items: list[dict]) -> dict:
+
+    grouped_order_items = {}
+
+    for order_item in order_items:
+        item = tuple(order_item.items())
+        if item not in grouped_order_items:
+            grouped_order_items[item] = 1
+        else:
+            grouped_order_items[item] += 1
+
+    return grouped_order_items

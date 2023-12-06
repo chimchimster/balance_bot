@@ -146,6 +146,7 @@ class OrderItem(Base):
     size = Column(DECIMAL(4, 2))
     color = Column(String(15))
     sex = Column(Enum(Gender, schema='commerce'))
+    qty = Column(Integer, default=1)
 
 
 class Orders(Base):
