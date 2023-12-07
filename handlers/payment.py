@@ -37,7 +37,7 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
     await cart.fill_up(in_cart)
 
     total_cost = await cart.calculate_sum_of_items()
-    print(total_cost)
+
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
