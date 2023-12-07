@@ -231,3 +231,11 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
     except sqlalchemy.exc.SQLAlchemyError:
         await transaction.rollback()
         return await message.answer('<code>Упс, что-то пошло не так...</code>')
+
+
+@router.callback_query(
+    F.data == 'restore_password'
+)
+async def restore_password_handler(query: CallbackQuery, state: FSMContext):
+
+    pass
