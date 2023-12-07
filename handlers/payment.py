@@ -256,6 +256,10 @@ async def payment_success_handler(message: Message, state: FSMContext):
         # Идея: возможно нужно пользователю выдавать айди заказа с которым он мог бы обратиться в поддержку.
         ...
 
-    return await balance_bot.send_message(message.chat.id, f'Спасибо за оплату заказа №{order_id}!')
+    return await balance_bot.send_message(
+        message.chat.id,
+        f'Спасибо за оплату заказа №{order_id}!',
+        reply_markup=await main_menu_markup(),
+    )
 
 
