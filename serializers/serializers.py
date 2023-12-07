@@ -19,6 +19,8 @@ class RedisSerializer:
     async def __serialize(value: Any):
         """ Дополняется по мере необходимости. """
 
+        if isinstance(value, Enum):
+            return value.name
         if isinstance(value, Decimal):
             return float(value)
         if isinstance(value, str):
@@ -30,5 +32,4 @@ class RedisSerializer:
                 serialized_value.append(new_val)
 
             return serialized_value
-        if isinstance(value, Enum):
-            return value.name
+

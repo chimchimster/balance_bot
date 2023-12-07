@@ -117,19 +117,12 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
                     apartment=apartment,
                     state=city_state,
                     post_code=post_code,
-                ).returning(
-                    Addresses.id,
-                    Addresses.country,
-                    Addresses.city,
-                    Addresses.street,
-                    Addresses.apartment,
-                    Addresses.phone
-                )
+                ).returning(Addresses.id)
 
                 address = await session.execute(insert_stmt)
-                address = address.scalar()
+                address_id = address.scalar()
 
-                await state.update_data({'current_address_id': address[0], 'current_address': address[1:]})
+                await state.update_data({'current_address_id': address_id})
 
     except sqlalchemy.exc.IntegrityError:
 
