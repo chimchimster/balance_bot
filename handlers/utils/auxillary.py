@@ -243,6 +243,27 @@ async def delete_prev_messages(
             ...
 
 
+async def update_state_after_deleting_prev_message(result_coro: Any, state: FSMContext):
+
+    if isinstance(result_coro, tuple) and len(result_coro) == 2:
+
+        await state.update_data(
+            {
+                'last_bot_msg_id': result_coro[0].message_id,
+                'last_bot_msg_photo_id': result_coro[-1].message_id,
+            }
+        )
+    elif isinstance(result_coro, (CallbackQuery, Message)):
+
+        await state.update_data(
+            {
+                'last_bot_msg_id': result_coro.message_id,
+            }
+        )
+    else:
+        raise ValueError
+
+
 def delete_prev_messages_and_update_state(coro: Callable):
 
     @functools.wraps(coro)
@@ -257,23 +278,7 @@ def delete_prev_messages_and_update_state(coro: Callable):
 
         result_coro = await coro(query_or_message, state, *args, **kwargs)
 
-        if isinstance(result_coro, tuple) and len(result_coro) == 2:
-
-            await state.update_data(
-                {
-                    'last_bot_msg_id': result_coro[0].message_id,
-                    'last_bot_msg_photo_id': result_coro[-1].message_id,
-                }
-            )
-        elif isinstance(result_coro, (CallbackQuery, Message)):
-
-            await state.update_data(
-                {
-                    'last_bot_msg_id': result_coro.message_id,
-                }
-            )
-        else:
-            raise ValueError
+        await update_state_after_deleting_prev_message(result_coro, state)
 
         return result_coro
 

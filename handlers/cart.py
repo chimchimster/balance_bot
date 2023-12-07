@@ -68,7 +68,7 @@ async def show_cart_handler(query: CallbackQuery, state: FSMContext):
         'cart/cart_detail.html',
         cart=items,
         total_price=total_price,
-        current_shipping_address=', '.join(current_address) if current_address != 'не выбран' else 'не выбран',
+        current_shipping_address=', '.join(map(lambda x: x if x is not None else "", current_address)) if current_address != 'не выбран' else 'не выбран',
     )
 
     return await query.message.answer(text=html, reply_markup=await get_cart_keyboard(
@@ -106,8 +106,9 @@ async def pick_address_handler(query: CallbackQuery, state: FSMContext):
     cart_items = data.get('in_cart')
 
     if shipping_addresses is not None:
-        # Ошибка при обработке shipping address
+
         current_address = shipping_addresses[picked_address_id]
+
         await state.update_data({'current_address': current_address, 'current_address_id': picked_address_id})
 
         cart = await CartManager.get_cart(tg_id)
@@ -119,7 +120,7 @@ async def pick_address_handler(query: CallbackQuery, state: FSMContext):
             'cart/cart_detail.html',
             cart=items,
             total_price=total_price,
-            current_shipping_address=', '.join(current_address) if current_address != 'не выбран' else 'не выбран',
+            current_shipping_address=', '.join(map(lambda x: x if x is not None else "", current_address)) if current_address != 'не выбран' else 'не выбран',
         )
 
         try:
@@ -127,8 +128,8 @@ async def pick_address_handler(query: CallbackQuery, state: FSMContext):
                 text=html,
                 message_id=last_bot_msg_id,
                 chat_id=query.message.chat.id,
-                reply_markup=await get_cart_keyboard(shipping_addresses)
+                reply_markup=await get_cart_keyboard(shipping_addresses, True if items else False)
             ).as_(balance_bot)
-            await query.answer(f'Выбран адрес доставки: {", ".join(current_address)}')
+            await query.answer(f'Выбран адрес доставки: {", ".join(map(lambda x: x if x is not None else "", current_address))}')
         except aiogram.exceptions.TelegramBadRequest:
             await query.answer('Указанный адрес уже выбран в качестве адреса доставки!')

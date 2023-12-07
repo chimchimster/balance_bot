@@ -103,6 +103,8 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
     apartment = shipping_query.shipping_address.street_line2
     post_code = shipping_query.shipping_address.post_code
 
+    data = await state.get_data()
+
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -117,12 +119,27 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
                     apartment=apartment,
                     state=city_state,
                     post_code=post_code,
-                ).returning(Addresses.id)
+                ).returning(
+                    Addresses.id,
+                    Addresses.country,
+                    Addresses.city,
+                    Addresses.street,
+                    Addresses.apartment,
+                    Addresses.phone
+                )
 
                 address = await session.execute(insert_stmt)
-                address_id = address.scalar()
+                address = address.scalar()
 
-                await state.update_data({'current_address_id': address_id})
+                shipping_addresses = {**data.get('shipping_addresses'), address[0]: address[1:]}
+
+                await state.update_data(
+                    {
+                        'current_address_id': address[0],
+                        'current_address': address[1:],
+                        'shipping_addresses': shipping_addresses,
+                    }
+                )
 
     except sqlalchemy.exc.IntegrityError:
 
@@ -145,7 +162,16 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
 
         address = await session.execute(select_stmt)
         address = address.first()
-        await state.update_data({'current_address_id': address[0], 'current_address': address[1:]})
+
+        shipping_addresses = {**data.get('shipping_addresses'), address[0]: address[1:]}
+
+        await state.update_data(
+            {
+                'current_address_id': address[0],
+                'current_address': address[1:],
+                'shipping_addresses': shipping_addresses,
+            }
+        )
 
     except sqlalchemy.exc.SQLAlchemyError:
         return await balance_bot.send_message(text='<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
