@@ -143,10 +143,11 @@ class OrderItem(Base):
 
     order_id = Column(Integer, ForeignKey('commerce.orders.id'), primary_key=True)
     item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
-    size = Column(DECIMAL(4, 2))
-    color = Column(String(15))
-    sex = Column(Enum(Gender, schema='commerce'))
+    size = Column(DECIMAL(4, 2), primary_key=True)
+    color = Column(String(15), primary_key=True)
+    sex = Column(Enum(Gender, schema='commerce'), primary_key=True)
     qty = Column(Integer, default=1)
+    address_id = Column(ForeignKey('commerce.addresses.id'))
 
 
 class Orders(Base):

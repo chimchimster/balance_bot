@@ -2,7 +2,7 @@ import aiogram.exceptions
 import sqlalchemy.exc
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.methods import EditMessageReplyMarkup, EditMessageText
+from aiogram.methods import EditMessageText
 from aiogram.types import CallbackQuery
 from sqlalchemy import select
 

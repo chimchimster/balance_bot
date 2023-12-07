@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import Column, Integer, BigInteger, String, Index, DateTime, UniqueConstraint, ForeignKeyConstraint, \
-    select, insert
+    select, insert, Text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import BYTEA
@@ -123,8 +123,10 @@ class Addresses(Base):
     country = Column(String(length=2), default='RU', nullable=False)
     city = Column(String(length=50), nullable=False)
     street = Column(String(255), nullable=False)
-    apartment = Column(String(length=10), nullable=False)
-    phone = Column(String(length=17), nullable=False)
+    apartment = Column(Text, nullable=True)
+    phone = Column(String(length=17), nullable=True)
+    state = Column(Text, nullable=True)
+    post_code = Column(Text, nullable=True)
 
     users = relationship('Users', back_populates='addresses')
 
@@ -133,30 +135,39 @@ class Addresses(Base):
             cls,
             user_id: int,
             country: str,
+            city_state: str,
+            post_code: str,
             city: str,
             street: str,
             apartment: str,
             phone: str,
             session: AsyncSession,
     ) -> int:
-        print(type(phone), phone)
+
         if not re.match(r'[A-Z]{2}', country):
             raise IncorrectInput(f'Допускается длина поля country равной 2-м символам и может содержать только заглавные'
                                  f' латинские буквы.')
 
-        if not re.match(r'[А-Яа-я\s]{5,50}', city):
+        if not re.match(r'[А-Яа-я\s-]{5,50}', city):
+            raise IncorrectInput(f'Допускается длина поля city от 5 до 50 символов.')
+
+        if not re.match(r'[А-Яа-я\s-]{5,50}', city_state):
             raise IncorrectInput(f'Допускается длина поля city от 5 до 50 символов.')
 
         if not re.match(r'[А-Яа-я\s]{5,255}', street):
             raise IncorrectInput(f'Допускается длина поля street от 5 до 255 символов.')
 
-        if not re.match(r'[А-Яа-я\d]{1,10}', apartment):
-            raise IncorrectInput(f'Допускается длина поля apartment от 1 до 10 символов.')
+        if not re.match(r'[А-Яа-я\d-]{1,50}', apartment):
+            raise IncorrectInput(f'Допускается длина поля apartment от 1 до 50 символов.')
 
-        if not re.match(r'^(\+7|8)\d{7,10}$', phone):
+        if not re.match(r'[А-Яа-я\d-]{1,50}', post_code):
+            raise IncorrectInput(f'Допускается длина поля post_code от 1 до 50 символов.')
+
+        if phone is not None and not re.match(r'^(\+7|8)\d{7,10}$', phone):
             raise IncorrectInput(f'Допустимый формат телефона +79999999999.')
 
-        phone = ''.join(re.findall(r'\d', phone)).lstrip('+')
+        if phone is not None:
+            phone = ''.join(re.findall(r'\d', phone)).lstrip('+')
 
         address_id = await session.execute(
             insert(cls).values(
@@ -165,7 +176,9 @@ class Addresses(Base):
                 city=city,
                 street=street,
                 apartment=apartment,
-                phone=phone
+                phone=phone,
+                post_code=post_code,
+                state=city_state,
             ).returning(cls.id)
         )
 

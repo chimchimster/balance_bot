@@ -122,8 +122,15 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Mess
                 if data:
                     return await paginate_over_items(query, state)
                 else:
-                    # message that there is no such items and show filters again
-                    pass
+                    return await query.message.answer(
+                        text='<code>К сожалению, по заданным вами фильтрам ничего не было найдено.'
+                             '\nПопробуете поискать еще?</code>',
+                        reply_markup=await get_search_filter_keyboard(
+                            color=color_title,
+                            brand=brand_title,
+                            sex=sex_title,
+                            size=size_title)
+                    )
     except sqlalchemy.exc.SQLAlchemyError:
         return await query.message.answer('<code>Упс, что-то пошло не так...</code>')
 

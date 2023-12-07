@@ -14,6 +14,7 @@ from database.models import *
 from database.handlers.utils.session import PostgresAsyncSession
 from database.handlers.utils.redis_client import connect_redis_url
 from database.models.exceptions.models_exc import *
+from keyboards.inline.app import main_menu_markup
 from keyboards.inline.auth import *
 from signals.signals import Signal
 from states.states import InitialState, RegState
@@ -66,8 +67,6 @@ async def cmd_start_handler(message: Message, state: FSMContext, **kwargs) -> Me
 )
 @delete_prev_messages_and_update_state
 async def register_user_handler(query: CallbackQuery, state: FSMContext):
-
-    await query.message.chat.delete_message(query.message.message_id)
 
     await state.set_state(RegState.INPUT_FIRST_NAME)
 
@@ -177,7 +176,7 @@ async def confirm_registration(message: Message, state: FSMContext) -> Message:
             'last_seen': now,
         })
 
-        return await message.answer('Успешная регистрация!')
+        return await message.answer('<code>Успешная регистрация!</code>', reply_markup=await main_menu_markup())
 
 
 @router.message(

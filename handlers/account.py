@@ -121,8 +121,10 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
                 if data:
                     return await paginate_over_bought_items(query, state)
                 else:
-                    # empty orders list template rendering
-                    pass
+                    return await query.message.answer(
+                        text='<code>У вас пока что нет покупок в нашем магазине.</code>',
+                        reply_markup=await personal_account_markup()
+                    )
     except sqlalchemy.exc.SQLAlchemyError:
         return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
 
@@ -267,15 +269,59 @@ async def add_apartment_handler(message: Message, state: FSMContext) -> Message:
 
     await message.chat.delete_message(message_id=message.message_id)
 
-    user_wrote = message.text
-    if not re.match(r'[А-Яа-я\d]{1,10}', user_wrote):
-        return await message.answer(
-            text='<code>Вы ввели менее одного и более 10 символов.</code>'
-        )
+    user_wrote = message.text if message.text else None
+
+    if user_wrote is not None:
+        if not re.match(r'[А-Яа-я\d]{1,50}', user_wrote):
+            return await message.answer(
+                text='<code>Вы ввели менее одного и более 50 символов.</code>'
+            )
 
     await state.update_data({'apartment': user_wrote})
+    await state.set_state(SetNewAddressState.STATE)
+    return await message.answer(text='<code>Введите область.</code>')
+
+
+@router.message(
+    SetNewAddressState.STATE,
+)
+@delete_prev_messages_and_update_state
+async def add_city_state_handler(message: Message, state: FSMContext) -> Message:
+
+    await message.chat.delete_message(message_id=message.message_id)
+
+    user_wrote = message.text if message.text else None
+
+    if user_wrote is not None:
+        if not re.match(r'[А-Яа-я\d]{1,50}', user_wrote):
+            return await message.answer(
+                text='<code>Вы ввели менее одного и более 50 символов.</code>'
+            )
+
+    await state.update_data({'city_state': user_wrote})
+    await state.set_state(SetNewAddressState.POST_CODE)
+    return await message.answer(text='<code>Введите почтовый индекс.</code>')
+
+
+@router.message(
+    SetNewAddressState.POST_CODE,
+)
+@delete_prev_messages_and_update_state
+async def add_post_code_handler(message: Message, state: FSMContext) -> Message:
+
+    await message.chat.delete_message(message_id=message.message_id)
+
+    user_wrote = message.text if message.text else None
+
+    if user_wrote is not None:
+        if not re.match(r'[А-Яа-я\d]{1,50}', user_wrote):
+            return await message.answer(
+                text='<code>Вы ввели менее одного и более 50 символов.</code>'
+            )
+
+    await state.update_data({'post_code': user_wrote})
     await state.set_state(SetNewAddressState.PHONE)
-    return await message.answer(text='<code>Введите номер телефона в формате +79999999999:</code>')
+    return await message.answer(text='<code>Введите номер телефона в формате +79999999999.</code>')
 
 
 @router.message(
@@ -301,6 +347,8 @@ async def add_phone_handler(message: Message, state: FSMContext):
     city = data.get('city')
     street = data.get('street')
     apartment = data.get('apartment')
+    city_state = data.get('city_state')
+    post_code = data.get('post_code')
     phone = data.get('phone')
 
     try:
@@ -313,11 +361,19 @@ async def add_phone_handler(message: Message, state: FSMContext):
                     street=street,
                     apartment=apartment,
                     phone=phone,
+                    city_state=city_state,
+                    post_code=post_code,
                     session=session,
                 )
                 await session.commit()
 
-                return await message.answer('<code>Адрес успешно добавлен!</code>', reply_markup=await personal_account_markup())
+                return await message.answer(
+                    text='<code>Адрес успешно добавлен!</code>',
+                    reply_markup=await personal_account_markup(),
+                )
 
     except sqlalchemy.exc.SQLAlchemyError:
-        return await message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
+        return await message.answer(
+            text='<code>Упс, что-то пошло не так...</code>',
+            reply_markup=await main_menu_markup(),
+        )

@@ -20,6 +20,8 @@ class SetNewAddressState(StatesGroup):
     CITY = State()
     STREET = State()
     APARTMENT = State()
+    STATE = State()
+    POST_CODE = State()
     PHONE = State()
 
 

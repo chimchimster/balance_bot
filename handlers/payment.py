@@ -4,11 +4,11 @@ import sqlalchemy.exc
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, PreCheckoutQuery, ShippingQuery, Message
-from sqlalchemy import insert, update
+from sqlalchemy import insert, update, select, desc
 
 from bot import bot as balance_bot
 from balance_bot.cart.cart import CartManager
-from database.models.schemas.auth import Users
+from database.models.schemas.auth import Users, Addresses
 from database.models.schemas.commerce import Orders, OrderItem
 from database.session import AsyncSessionLocal
 from keyboards.inline.app import main_menu_markup
@@ -37,7 +37,7 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
     await cart.fill_up(in_cart)
 
     total_cost = await cart.calculate_sum_of_items()
-
+    print(total_cost)
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -58,7 +58,7 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
                             'item_id': item.get('id'),
                             'color': item.get('color') if item.get('color') != 'Без фильтра' else None,
                             'size': item.get('size') if item.get('size') != 'Без фильтра' else None,
-                            'sex': item.get('sex') if item.get('sex') != 'Без фильтра' else None,
+                            'sex': item.get('sex').split('.')[-1] if item.get('sex') != 'Без фильтра' else None,
                         }
                         for item in await cart.get_items if item.get('id') is not None
                     ]
@@ -85,13 +85,52 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
         description=f'Заказ в магазине Balance. Номер заказа №{order_id}',
         provider_token=bot_settings.payment_provider_token.get_secret_value(),
         currency='rub',
-        prices=[aiogram.types.LabeledPrice(label=f'Заказ №{order_id}', amount=int(total_cost * 10))],
+        prices=[aiogram.types.LabeledPrice(label=f'Заказ №{order_id}', amount=int(total_cost * 100))],
         payload=payload,
+        is_flexible=True,
     )
 
 
 @router.shipping_query()
-async def shipping_handler(shipping_query: ShippingQuery):
+async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
+
+    tg_id = shipping_query.from_user.id
+
+    country = shipping_query.shipping_address.country_code
+    city = shipping_query.shipping_address.city
+    city_state = shipping_query.shipping_address.state
+    street = shipping_query.shipping_address.street_line1
+    apartment = shipping_query.shipping_address.street_line2
+    post_code = shipping_query.shipping_address.post_code
+
+    try:
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+
+                user_id_subquery = select(Users.id).filter_by(tg_id=tg_id).scalar_subquery()
+
+                insert_stmt = insert(Addresses).values(
+                    user_id=user_id_subquery,
+                    country=country,
+                    city=city,
+                    street=street,
+                    apartment=apartment,
+                    state=city_state,
+                    post_code=post_code,
+                ).returning(Addresses.id)
+
+                address_id = await session.execute(insert_stmt)
+                address_id = address_id.scalar()
+
+                await state.update_data({'current_address_id': address_id})
+
+    except sqlalchemy.exc.IntegrityError as i:
+
+        pass
+
+    except sqlalchemy.exc.SQLAlchemyError as s:
+        print('s: ', s)
+
     await balance_bot.answer_shipping_query(
         shipping_query.id,
         ok=True,
@@ -118,11 +157,13 @@ async def payment_success_handler(message: Message, state: FSMContext):
     user_id = payload_dict.get('user_id')
     order_id = payload_dict.get('order_id')
 
+    data = await state.get_data()
+
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
 
-                if user_id and order_id:
+                if user_id is not None and order_id is not None:
                     update_stmt = update(Orders).where(
                         Orders.user_id == user_id, Orders.id == order_id
                     ).values(paid=True)
@@ -131,7 +172,39 @@ async def payment_success_handler(message: Message, state: FSMContext):
                 else:
                     raise sqlalchemy.exc.SQLAlchemyError
 
-    except sqlalchemy.exc.SQLAlchemyError:
+                curr_address_id = data.get('current_address_id')
+
+                if curr_address_id is not None:
+
+                    update_stmt = update(OrderItem).filter(
+                        OrderItem.order_id == order_id
+                    ).values(address_id=curr_address_id)
+
+                    await session.execute(update_stmt)
+
+                else:
+
+                    select_stmt = select(Addresses.id).filter_by(user_id=user_id).order_by(desc(Addresses.id))
+
+                    last_address_id = await session.execute(select_stmt).first()
+
+                    last_address_id = last_address_id[0] if last_address_id else None
+
+                    if last_address_id is not None:
+
+                        update_stmt = update(OrderItem).filter(
+                            OrderItem.order_id == order_id
+                        ).values(address_id=last_address_id)
+
+                        await session.execute(update_stmt)
+                    else:
+                        return await balance_bot.send_message(
+                            text='<code>Вы не можете оплачивать покупки пока не добавите адрес доставки. '
+                                 'Сделать это можно в личном кабинете.</code>'
+                        )
+
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        print(e)
         # Нужно придумать как поступать в данной ситуации.
         # Идея: возможно нужно пользователю выдавать айди заказа с которым он мог бы обратиться в поддержку.
         ...
