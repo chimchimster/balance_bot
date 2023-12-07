@@ -124,12 +124,17 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
 
                 await state.update_data({'current_address_id': address_id})
 
-    except sqlalchemy.exc.IntegrityError as i:
+    except sqlalchemy.exc.IntegrityError:
 
-        pass
+        user_id_subquery = select(Users.id).filter_by(tg_id=tg_id).scalar_subquery()
 
-    except sqlalchemy.exc.SQLAlchemyError as s:
-        print('s: ', s)
+        select_stmt = select(Addresses.id).filter_by(user_id=user_id_subquery).order_by(desc(Addresses.id))
+
+        address_id = await session.execute(select_stmt).first()
+        await state.update_data({'current_address_id': address_id})
+
+    except sqlalchemy.exc.SQLAlchemyError:
+        return await balance_bot.send_message(text='<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
 
     await balance_bot.answer_shipping_query(
         shipping_query.id,
