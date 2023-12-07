@@ -11,9 +11,9 @@ from balance_bot.cart.cart import CartManager
 from database.models.schemas.auth import Users, Addresses
 from database.models.schemas.commerce import Orders, OrderItem
 from database.session import AsyncSessionLocal
-from keyboards.inline.app import main_menu_markup
+from keyboards.inline.app import main_menu_markup, personal_account_markup
 from handlers.utils.auxillary import group_order, delete_prev_messages_and_update_state
-from handlers.options import shipping_options
+from handlers.utils.options import shipping_options
 from states.states import PaymentsState
 from conf import bot_settings
 
@@ -117,26 +117,47 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
                     apartment=apartment,
                     state=city_state,
                     post_code=post_code,
-                ).returning(Addresses.id)
+                ).returning(
+                    Addresses.id,
+                    Addresses.country,
+                    Addresses.city,
+                    Addresses.street,
+                    Addresses.apartment,
+                    Addresses.phone
+                )
 
-                address_id = await session.execute(insert_stmt)
-                address_id = address_id.scalar()
+                address = await session.execute(insert_stmt)
+                address = address.scalar()
 
-                await state.update_data({'current_address_id': address_id})
+                await state.update_data({'current_address_id': address[0], 'current_address': address[1:]})
 
     except sqlalchemy.exc.IntegrityError:
 
         user_id_subquery = select(Users.id).filter_by(tg_id=tg_id).scalar_subquery()
 
-        select_stmt = select(Addresses.id).filter_by(user_id=user_id_subquery).order_by(desc(Addresses.id))
+        select_stmt = select(
+            Addresses.id,
+            Addresses.country,
+            Addresses.city,
+            Addresses.street,
+            Addresses.apartment,
+            Addresses.phone,
+        ).filter_by(
+            user_id=user_id_subquery
+        ).order_by(
+            desc(
+                Addresses.id
+            )
+        )
 
-        address_id = await session.execute(select_stmt).first()
-        await state.update_data({'current_address_id': address_id})
+        address = await session.execute(select_stmt)
+        address = address.first()
+        await state.update_data({'current_address_id': address[0], 'current_address': address[1:]})
 
     except sqlalchemy.exc.SQLAlchemyError:
         return await balance_bot.send_message(text='<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
 
-    await balance_bot.answer_shipping_query(
+    return await balance_bot.answer_shipping_query(
         shipping_query.id,
         ok=True,
         shipping_options=shipping_options,
@@ -146,7 +167,7 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
 
 @router.pre_checkout_query()
 async def checkout_handler(pre_checkout_query: PreCheckoutQuery):
-    await balance_bot.answer_pre_checkout_query(
+    return await balance_bot.answer_pre_checkout_query(
         pre_checkout_query.id,
         ok=True,
         error_message="Что-то пошло не так?",
@@ -154,6 +175,7 @@ async def checkout_handler(pre_checkout_query: PreCheckoutQuery):
 
 
 @router.message(F.successful_payment)
+@delete_prev_messages_and_update_state
 async def payment_success_handler(message: Message, state: FSMContext):
 
     payload_str = message.successful_payment.invoice_payload
@@ -205,7 +227,8 @@ async def payment_success_handler(message: Message, state: FSMContext):
                     else:
                         return await balance_bot.send_message(
                             text='<code>Вы не можете оплачивать покупки пока не добавите адрес доставки. '
-                                 'Сделать это можно в личном кабинете.</code>'
+                                 'Сделать это можно в личном кабинете.</code>',
+                            reply_markup=await personal_account_markup()
                         )
 
     except sqlalchemy.exc.SQLAlchemyError as e:
@@ -214,6 +237,6 @@ async def payment_success_handler(message: Message, state: FSMContext):
         # Идея: возможно нужно пользователю выдавать айди заказа с которым он мог бы обратиться в поддержку.
         ...
 
-    await balance_bot.send_message(message.chat.id, f'Спасибо за оплату заказа №{order_id}!')
+    return await balance_bot.send_message(message.chat.id, f'Спасибо за оплату заказа №{order_id}!')
 
 

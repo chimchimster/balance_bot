@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from callback_data.callback_data import AvailableItemsCallbackData
+from conf import bot_settings
 
 
 async def get_search_filter_keyboard(
@@ -27,11 +28,17 @@ async def get_search_filter_keyboard(
     show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
     back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
 
+    support_button = InlineKeyboardButton(
+        text='Обратиться в поддержку',
+        url=f'https://t.me/{bot_settings.support_username.get_secret_value()}'
+    )
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [brand_button, size_button],
         [sex_button, color_button],
         [apply_filters_button],
         [show_cart_button],
+        [support_button],
         [back_to_main_menu_button],
     ])
 
@@ -84,12 +91,18 @@ async def items_markup(has_next: bool, has_prev: bool, **kwargs) -> InlineKeyboa
 
     show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
 
+    support_button = InlineKeyboardButton(
+        text='Обратиться в поддержку',
+        url=f'https://t.me/{bot_settings.support_username.get_secret_value()}'
+    )
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
             pagination_buttons,
             [add_to_cart_button],
             [delete_from_cart_button] if update_cart > 0 else [],
             [current_filter_button],
             [show_cart_button],
+            [support_button],
             [back_to_main_menu_button],
         ]
     )

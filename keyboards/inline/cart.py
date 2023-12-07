@@ -1,6 +1,8 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from conf import bot_settings
+
 
 async def get_cart_keyboard(addresses: dict, cart_has_items: bool = False) -> InlineKeyboardMarkup:
 
@@ -20,9 +22,15 @@ async def get_cart_keyboard(addresses: dict, cart_has_items: bool = False) -> In
 
     back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
 
+    support_button = InlineKeyboardButton(
+        text='Обратиться в поддержку',
+        url=f'https://t.me/{bot_settings.support_username.get_secret_value()}'
+    )
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [pay_orders_button] if cart_has_items else [],
             [clean_cart_up_button],
+            [support_button],
             [back_to_main_menu_button],
         ]
     )

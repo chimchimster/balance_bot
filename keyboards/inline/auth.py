@@ -1,5 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+from conf import bot_settings
+
 
 async def get_registration_keyboard() -> InlineKeyboardMarkup:
 
@@ -13,9 +15,15 @@ async def get_registration_keyboard() -> InlineKeyboardMarkup:
         callback_data='exit'
     )
 
+    support_button = InlineKeyboardButton(
+        text='Обратиться в поддержку',
+        url=f'https://t.me/{bot_settings.support_username.get_secret_value()}'
+    )
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [register_button],
         [exit_button],
+        [support_button],
     ])
 
     return keyboard

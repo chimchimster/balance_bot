@@ -184,7 +184,7 @@ async def confirm_registration(message: Message, state: FSMContext) -> Message:
     F.text == 'Нет',
 )
 async def refuse_registration(message: Message, state: FSMContext) -> Message:
-    bot_message = await message.answer('<code>Очень жаль... может быть в другой раз?</code>')
+    bot_message = await message.answer('<code>Очень жаль... может быть /start в другой раз?</code>')
 
     await state.update_data({'last_bot_msg_id': bot_message.message_id})
 

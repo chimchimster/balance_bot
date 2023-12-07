@@ -106,7 +106,7 @@ async def pick_address_handler(query: CallbackQuery, state: FSMContext):
     cart_items = data.get('in_cart')
 
     if shipping_addresses is not None:
-
+        # Ошибка при обработке shipping address
         current_address = shipping_addresses[picked_address_id]
         await state.update_data({'current_address': current_address, 'current_address_id': picked_address_id})
 

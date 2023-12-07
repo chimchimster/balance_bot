@@ -115,8 +115,8 @@ class Addresses(Base):
     __tablename__ = 'addresses'
     __table_args__ = (
         ForeignKeyConstraint(columns=['user_id'], refcolumns=['auth.users.id'], onupdate='CASCADE', ondelete='CASCADE'),
+        UniqueConstraint('user_id', 'country', 'city', 'street', 'apartment', name='address_unique_constraint'),
         {'schema': 'auth'} if not DEBUG else None,
-        UniqueConstraint('user_id', 'country', 'city', 'street', 'apartment')
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
