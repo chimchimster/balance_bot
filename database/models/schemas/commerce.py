@@ -141,7 +141,7 @@ class OrderItem(Base):
         male = 'male'
         female = 'female'
 
-    order_id = Column(Integer, ForeignKey('commerce.orders.id'), primary_key=True)
+    order_id = Column(Integer, ForeignKey('commerce.orders.id', ondelete='CASCADE'), primary_key=True)
     item_id = Column(Integer, ForeignKey('commerce.items.id'), primary_key=True)
     size = Column(DECIMAL(4, 2), primary_key=True)
     color = Column(String(15), primary_key=True)
@@ -158,7 +158,7 @@ class Orders(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('auth.users.id' if not DEBUG else 'users.id'))
+    user_id = Column(Integer, ForeignKey('auth.users.id' if not DEBUG else 'users.id', ondelete='CASCADE'))
     date_created = Column(DateTime, default=datetime.utcnow())
     paid = Column(Boolean, default=False)
 
@@ -178,7 +178,7 @@ class Deliveries(Base):
         on_the_way = 'on_the_way'
         delivered = 'delivered'
 
-    order_id = Column(Integer, ForeignKey('commerce.orders.id'), primary_key=True)
+    order_id = Column(Integer, ForeignKey('commerce.orders.id', ondelete='CASCADE'), primary_key=True)
     status = Column(Enum(Statuses, schema='commerce'), default=Statuses.in_stock)
     track_code = Column(String(length=100))
 

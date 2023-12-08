@@ -29,6 +29,7 @@ WEBHOOK_URL = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={SERVER_U
 async def on_startup(bot: Bot) -> None:
     await setup_database()
 
+    await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(WEBHOOK_URL)
 
 
@@ -37,9 +38,15 @@ def main() -> None:
     r_con = loop.run_until_complete(connect_redis_url())
     loop.close()
 
-    dp = Dispatcher(storage=RedisStorage(r_con))
-    dp.message.outer_middleware(AuthUserMiddleware())
-    dp.callback_query.outer_middleware(CartIsFullFiledMiddleware())
+    redis_storage = RedisStorage(r_con)
+
+    auth_middleware = AuthUserMiddleware(storage=redis_storage)
+    cart_filled_middleware = CartIsFullFiledMiddleware()
+
+    dp = Dispatcher(storage=redis_storage)
+    dp.message.outer_middleware(auth_middleware)
+    dp.callback_query.outer_middleware(auth_middleware)
+    dp.callback_query.outer_middleware(cart_filled_middleware)
     dp.include_routers(
         auth_router,
         app_router,

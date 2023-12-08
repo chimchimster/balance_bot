@@ -5,7 +5,7 @@ import sqlalchemy.exc
 from aiogram.fsm.context import FSMContext
 
 from sqlalchemy import select
-from sqlalchemy.sql.functions import count, func
+from sqlalchemy.sql.functions import count, func, coalesce
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
@@ -30,7 +30,6 @@ router = Router()
 )
 @delete_prev_messages_and_update_state
 async def personal_account_handler(query: CallbackQuery, state: FSMContext):
-
     tg_id = query.message.chat.id
 
     try:
@@ -43,13 +42,13 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                             Users.id,
                             Users.first_name,
                             Users.last_name,
-                            count(Orders.id.distinct()),
-                            func.sum(Items.price)
+                            coalesce(count(Orders.id.distinct()), 0),
+                            coalesce(func.sum(Items.price), 0)
                         )
-                        .join(Orders, Orders.user_id == Users.id)
-                        .join(OrderItem)
-                        .join(Items)
-                        .filter(Users.tg_id == tg_id)
+                        .outerjoin(Orders, Orders.user_id == Users.id)
+                        .outerjoin(OrderItem)
+                        .outerjoin(Items)
+                        .filter(Users.tg_id == tg_id, Orders.paid.is_(True))
                         .group_by(Users.id)
                     )
 
@@ -74,7 +73,10 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                     return await query.message.answer(text=html, reply_markup=await personal_account_markup())
 
     except sqlalchemy.exc.SQLAlchemyError:
-        return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
+        return await query.message.answer(
+            '<code>Упс, что-то пошло не так...</code>',
+            reply_markup=await main_menu_markup()
+        )
 
 
 @router.callback_query(
@@ -82,7 +84,6 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
 )
 @delete_prev_messages_and_update_state
 async def all_orders_handler(query: CallbackQuery, state: FSMContext):
-
     data = await state.get_data()
 
     tg_id = query.message.chat.id
@@ -108,7 +109,7 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
                     .join(Brands)
                     .join(ItemsImages)
                     .join(Images)
-                    .filter(Orders.user_id == user_id)
+                    .filter(Orders.user_id == user_id, Orders.paid.is_(True))
                 )
 
                 data = stmt_result.fetchmany(100)
@@ -126,7 +127,8 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
                         reply_markup=await personal_account_markup()
                     )
     except sqlalchemy.exc.SQLAlchemyError:
-        return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
+        return await query.message.answer('<code>Упс, что-то пошло не так...</code>',
+                                          reply_markup=await main_menu_markup())
 
 
 @router.callback_query(
@@ -142,7 +144,6 @@ async def paginate_over_bought_items(
         query: CallbackQuery,
         state: FSMContext,
 ) -> Awaitable:
-
     return await paginate(
         query,
         state,
@@ -181,11 +182,18 @@ async def show_addresses_handler(
                 )
 
                 data = [AddressItem(*args) for args in stmt_result.fetchall()]
-                html = await render_template('account/personal_addresses.html', addresses=data)
-                return await query.message.answer(text=html, reply_markup=await back_to_account_markup())
 
+                if data:
+                    html = await render_template('account/personal_addresses.html', addresses=data)
+                    return await query.message.answer(text=html, reply_markup=await back_to_account_markup())
+                else:
+                    return await query.message.answer(
+                        text='<code>У вас пока что нет ни одного добавленного адреса.</code>',
+                        reply_markup=await back_to_account_markup()
+                    )
     except sqlalchemy.exc.SQLAlchemyError:
-        return await query.message.answer('<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
+        return await query.message.answer('<code>Упс, что-то пошло не так...</code>',
+                                          reply_markup=await main_menu_markup())
 
 
 @router.callback_query(
@@ -196,7 +204,6 @@ async def add_address_handler(
         query: CallbackQuery,
         state: FSMContext
 ) -> Message:
-
     await state.set_state(SetNewAddressState.REGION)
 
     button_ru = KeyboardButton(text='ru')
@@ -214,7 +221,6 @@ async def add_address_handler(
 )
 @delete_prev_messages_and_update_state
 async def add_region_handler(message: Message, state: FSMContext):
-
     await message.chat.delete_message(message_id=message.message_id)
 
     user_choice = message.text.upper()
@@ -228,7 +234,6 @@ async def add_region_handler(message: Message, state: FSMContext):
 )
 @delete_prev_messages_and_update_state
 async def add_city_handler(message: Message, state: FSMContext) -> Message:
-
     await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text
@@ -247,7 +252,6 @@ async def add_city_handler(message: Message, state: FSMContext) -> Message:
 )
 @delete_prev_messages_and_update_state
 async def add_street_handler(message: Message, state: FSMContext) -> Message:
-
     await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text
@@ -266,7 +270,6 @@ async def add_street_handler(message: Message, state: FSMContext) -> Message:
 )
 @delete_prev_messages_and_update_state
 async def add_apartment_handler(message: Message, state: FSMContext) -> Message:
-
     await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text if message.text else None
@@ -287,7 +290,6 @@ async def add_apartment_handler(message: Message, state: FSMContext) -> Message:
 )
 @delete_prev_messages_and_update_state
 async def add_city_state_handler(message: Message, state: FSMContext) -> Message:
-
     await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text if message.text else None
@@ -308,7 +310,6 @@ async def add_city_state_handler(message: Message, state: FSMContext) -> Message
 )
 @delete_prev_messages_and_update_state
 async def add_post_code_handler(message: Message, state: FSMContext) -> Message:
-
     await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text if message.text else None
@@ -329,7 +330,6 @@ async def add_post_code_handler(message: Message, state: FSMContext) -> Message:
 )
 @delete_prev_messages_and_update_state
 async def add_phone_handler(message: Message, state: FSMContext):
-
     await message.chat.delete_message(message_id=message.message_id)
 
     user_wrote = message.text

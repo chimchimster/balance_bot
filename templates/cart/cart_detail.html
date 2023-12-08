@@ -5,7 +5,7 @@ ______________________
 Бренд: {{ item.brand_name }}
 Цвет: {{ item.color|no_filter }}
 Размер: {{ item.size|no_filter }}
-Пол: {{ item.sex|no_filter }}
+Пол: {{ item.sex|no_filter|convert_sex }}
 Цена: {{ item.price }}₽
 {% if not loop.last %}
 ______________________

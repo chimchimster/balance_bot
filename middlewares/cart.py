@@ -22,7 +22,9 @@ class CartIsFullFiledMiddleware(BaseMiddleware):
 
         query_text = event.data
 
-        if len(await cart.get_items) >= CART_OVERFLOW and query_text == 'add_to_cart':
+        items = await cart.get_items
+
+        if items and len(items) >= CART_OVERFLOW and query_text == 'add_to_cart':
             return await event.answer(
                 text='Ваша корзина переполнена. Пожалуйста, удалите элементы корзины либо оплатите, '
                      'чтобы продолжить покупки.'

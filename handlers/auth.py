@@ -2,10 +2,11 @@ import re
 import time
 from typing import Optional
 
+import aiogram.exceptions
 import sqlalchemy.exc
 
 from aiogram import Router, F
-from aiogram.filters import CommandStart
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy import select
@@ -15,8 +16,6 @@ from database.handlers.utils.session import PostgresAsyncSession
 from database.handlers.utils.redis_client import connect_redis_url
 from database.models.exceptions.models_exc import *
 from keyboards.inline.app import main_menu_markup
-from keyboards.inline.auth import *
-from signals.signals import Signal
 from states.states import InitialState, RegState
 from handlers.utils.auxillary import validate_user_registration, password_matched, delete_prev_messages_and_update_state
 from handlers.app import main_menu_handler
@@ -24,41 +23,16 @@ from handlers.app import main_menu_handler
 router = Router()
 
 
-@router.message(CommandStart())
+@router.message(Command(commands=['run', 'start']))
 @delete_prev_messages_and_update_state
-async def cmd_start_handler(message: Message, state: FSMContext, **kwargs) -> Message:
-    auth_state = kwargs.pop('auth_state')
+async def cmd_start_handler(message: Message, state: FSMContext) -> Message:
 
-    if not auth_state:
-        return await message.answer('<code>Увы, что-то пошло не так...</code>')
+    state_level = await state.get_state()
 
-    match auth_state:
-        case Signal.AUTHENTICATED:
+    if state_level == InitialState.TO_AUTHENTICATION:
+        return await authenticate_user(message, state)
 
-            await state.set_state(InitialState.TO_APPLICATION)
-
-            return await main_menu_handler(message, state)
-
-        case Signal.NOT_AUTHENTICATED:
-
-            await state.set_state(InitialState.TO_AUTHENTICATION)
-
-            bot_message = await message.answer(
-                f'<code>Привет, {message.from_user.username}!\n\nЧтобы авторизоваться введи пароль:</code>')
-
-        case Signal.NOT_REGISTERED:
-
-            await state.set_state(InitialState.TO_REGISTRATION)
-
-            bot_message = await message.answer(
-                f'<code>Привет, {message.from_user.username}\n\nЧтобы начать пользоваться нашим магазином нужно '
-                f'зарегистрироваться.\n\nЭто займет совсем немного времни, начнем?</code>',
-                reply_markup=await get_registration_keyboard())
-        case _:
-            # 500 server error
-            bot_message = await message.answer('<code>Возникла ошибка 404!</code>')
-
-    return bot_message
+    return await main_menu_handler(message, state)
 
 
 @router.callback_query(
@@ -200,7 +174,13 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
     tg_id = message.from_user.id
     pwd = message.text
 
+    try:
+        await message.chat.delete_message(message_id=message.message_id)
+    except aiogram.exceptions.TelegramBadRequest:
+        ...
+
     if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', pwd):
+
         return await message.answer('<code>У вас ошибка, может вы опечатались?</code>')
 
     try:
@@ -209,20 +189,27 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
                 try:
                     user_id = await Users.get_user_id(tg_id, session)
                 except UserNotFound:
-                    await message.answer('<code>Упс, такого пользователя не существует...</code>')
+                    bot_message = await message.answer('<code>Упс, такого пользователя не существует...</code>')
                     await transaction.rollback()
+                    return bot_message
                 else:
                     credentials = await session.execute(select(Credentials).filter_by(user_id=user_id))
                     credentials = credentials.scalar()
                     pwd_matched = await credentials.check_password(pwd)
 
                     if not pwd_matched:
-                        await message.chat.delete_message(message_id=message.message_id)
 
                         return await message.answer(
-                            '<code>Увы, пароли не совпадают. Может вы опечатались?</code>')
+                            '<code>Увы, пароли не совпадают. Может вы опечатались?</code>'
+                        )
 
-                    await message.chat.delete_message(message_id=message.message_id)
+                    await credentials.set_auth_hash()
+
+                    r_cli = await connect_redis_url()
+                    await r_cli.hset(f'auth_hash:{tg_id}', mapping={
+                        'hash': credentials.auth_hash,
+                        'last_seen': credentials.last_seen,
+                    })
 
                     await state.set_state(InitialState.TO_APPLICATION)
 

@@ -95,7 +95,7 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
 async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
 
     tg_id = shipping_query.from_user.id
-
+    print(tg_id)
     country = shipping_query.shipping_address.country_code
     city = shipping_query.shipping_address.city
     city_state = shipping_query.shipping_address.state
@@ -129,7 +129,7 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
                 )
 
                 address = await session.execute(insert_stmt)
-                address = address.scalar()
+                address = address.fetchone()
 
                 shipping_addresses = {**data.get('shipping_addresses'), address[0]: address[1:]}
 
@@ -209,14 +209,15 @@ async def payment_success_handler(message: Message, state: FSMContext):
         async with AsyncSessionLocal() as session:
             async with session.begin():
 
-                if user_id is not None and order_id is not None:
-                    update_stmt = update(Orders).where(
-                        Orders.user_id == user_id, Orders.id == order_id
-                    ).values(paid=True)
+                if message.successful_payment:
+                    if user_id is not None and order_id is not None:
+                        update_stmt = update(Orders).where(
+                            Orders.user_id == user_id, Orders.id == order_id
+                        ).values(paid=True)
 
-                    await session.execute(update_stmt)
-                else:
-                    raise sqlalchemy.exc.SQLAlchemyError
+                        await session.execute(update_stmt)
+                    else:
+                        raise sqlalchemy.exc.SQLAlchemyError
 
                 curr_address_id = data.get('current_address_id')
 
@@ -261,5 +262,3 @@ async def payment_success_handler(message: Message, state: FSMContext):
         f'Спасибо за оплату заказа №{order_id}!',
         reply_markup=await main_menu_markup(),
     )
-
-

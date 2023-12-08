@@ -29,17 +29,7 @@ async def check_auth_state(
                 async with session.begin() as transaction:
 
                     try:
-                        user_id = await Users.get_user_id(tg_id, session)
-
-                        credentials = Credentials(user_id=user_id)
-                        await credentials.set_auth_hash()
-
-                        await r_cli.hset(f'auth_hash:{tg_id}', mapping={
-                            'hash': credentials.auth_hash,
-                            'last_seen': credentials.last_seen,
-                        })
-                        await transaction.commit()
-
+                        await Users.get_user_id(tg_id, session)
                     except UserNotFound:
                         await transaction.rollback()
                         return Signal.NOT_REGISTERED
