@@ -1,6 +1,6 @@
 aiofiles==23.2.1
 aiogram @ git+https://github.com/aiogram/aiogram.git@228a86afdc3c594dd9db9e82d8d6d445adb5ede1
-aiohttp==3.8.6
+aiohttp==3.9.0
 aioredis==2.0.1
 aiosignal==1.3.1
 aiosmtplib==3.0.1
