@@ -6,7 +6,7 @@ from aiogram.methods import EditMessageText
 from aiogram.types import CallbackQuery
 from sqlalchemy import select
 
-from cart.cart import CartManager
+from apps.cart.cart import CartManager
 from database.models.schemas.auth import Addresses, Users
 from database.session import AsyncSessionLocal
 from utils.jinja_template import render_template

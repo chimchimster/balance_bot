@@ -8,6 +8,8 @@ class BotSettings(BaseSettings):
     payment_provider_token: SecretStr
     server_token: SecretStr
     support_username: SecretStr
+    smtp_host: SecretStr
+    smtp_port: SecretStr
 
     model_config = SettingsConfigDict(
         env_file=pathlib.Path('/home/newuser/balance_tg/balance_bot/.env'),

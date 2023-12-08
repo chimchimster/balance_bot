@@ -3,7 +3,7 @@ from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery
 
-from cart.cart import CartManager
+from apps.cart.cart import CartManager
 from middlewares.settings import CART_OVERFLOW
 
 

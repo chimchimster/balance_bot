@@ -1,7 +1,5 @@
-import json
-from typing import Optional, Dict
+from typing import Dict
 
-import aiogram.exceptions
 import sqlalchemy.exc
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
@@ -11,12 +9,12 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select, join, text
 
 from callback_data.callback_data import AvailableItemsCallbackData
-from cart.cart import CartManager, Cart
+from apps.cart.cart import CartManager, Cart
 from database.models import *
 from database.session import AsyncSessionLocal
 from handlers.utils.named_entities import Item
 from keyboards.inline.purchases import get_search_filter_keyboard, items_markup
-from handlers.utils.auxillary import filter_products, paginate, delete_prev_messages, delete_prev_messages_and_update_state
+from handlers.utils.auxillary import filter_products, paginate, delete_prev_messages_and_update_state
 from balance_bot.utils.paginator import Paginator
 from mem_storage import paginator_storage
 from balance_bot.bot import bot as balance_bot

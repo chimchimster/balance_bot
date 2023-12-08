@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, PreCheckoutQuery, ShippingQuery, Messag
 from sqlalchemy import insert, update, select, desc
 
 from bot import bot as balance_bot
-from balance_bot.cart.cart import CartManager
+from apps.cart.cart import CartManager
 from database.models.schemas.auth import Users, Addresses
 from database.models.schemas.commerce import Orders, OrderItem
 from database.session import AsyncSessionLocal

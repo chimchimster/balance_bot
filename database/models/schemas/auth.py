@@ -1,6 +1,7 @@
 import os
 import re
 import hashlib
+import secrets
 import time
 
 from datetime import datetime
@@ -263,7 +264,8 @@ class Credentials(Base):
 
     async def set_auth_hash(self):
 
-        user_hash = hashlib.sha256().hexdigest()
+        user_data = secrets.token_hex(16)
+        user_hash = hashlib.sha256(user_data.encode()).hexdigest()
         now = int(time.time())
 
         self.auth_hash = user_hash
