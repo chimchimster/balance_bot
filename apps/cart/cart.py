@@ -38,7 +38,8 @@ class Cart:
         self._items.clear()
 
     async def fill_up(self, previous_data):
-        self._items = previous_data
+        if previous_data is not None:
+            self._items = previous_data
 
     @property
     async def get_items(self) -> list:

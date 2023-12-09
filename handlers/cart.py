@@ -55,6 +55,7 @@ async def show_cart_handler(query: CallbackQuery, state: FSMContext):
     cart_items = data.get('in_cart')
 
     cart = await CartManager.get_cart(tg_id)
+
     await cart.fill_up(cart_items)
     items = await cart.get_items
     total_price = await cart.calculate_sum_of_items()

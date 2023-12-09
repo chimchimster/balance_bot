@@ -10,7 +10,7 @@ class EnvironmentsSettings(DotEnvSettingsSource):
 
 
 if not DEBUG:
-    env_file_path = Path('/home/newuser/balance_tg/balance_bot/database/.env') # ABS
+    env_file_path = Path.cwd() / 'balance_bot' / 'database' / '.env'
 else:
     env_file_path = Path.cwd() / '.env'
 

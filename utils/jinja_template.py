@@ -5,7 +5,7 @@ from .jinja_template_filters import no_filters, convert_sex
 
 
 template_env = Environment(loader=FileSystemLoader(
-    pathlib.Path('/home/newuser/balance_tg/balance_bot/') / 'templates',
+    pathlib.Path.cwd() / 'balance_bot' / 'templates',
     ),
     autoescape=select_autoescape(['html']),
     enable_async=True,

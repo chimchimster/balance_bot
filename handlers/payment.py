@@ -95,7 +95,7 @@ async def start_payment_handler(query: CallbackQuery, state: FSMContext):
 async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
 
     tg_id = shipping_query.from_user.id
-    print(tg_id)
+
     country = shipping_query.shipping_address.country_code
     city = shipping_query.shipping_address.city
     city_state = shipping_query.shipping_address.state

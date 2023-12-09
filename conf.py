@@ -12,7 +12,7 @@ class BotSettings(BaseSettings):
     smtp_port: SecretStr
 
     model_config = SettingsConfigDict(
-        env_file=pathlib.Path('/home/newuser/balance_tg/balance_bot/.env'),
+        env_file=pathlib.Path.cwd() / 'balance_bot' / '.env',
         env_file_encoding='utf-8',
     )
 

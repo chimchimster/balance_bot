@@ -4,7 +4,7 @@ from typing import Awaitable
 import sqlalchemy.exc
 from aiogram.fsm.context import FSMContext
 
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from sqlalchemy.sql.functions import count, func, coalesce
 
 from aiogram import Router, F
@@ -45,11 +45,11 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                             coalesce(count(Orders.id.distinct()), 0),
                             coalesce(func.sum(Items.price), 0)
                         )
-                        .outerjoin(Orders, Orders.user_id == Users.id)
+                        .outerjoin(Orders, and_(Orders.user_id == Users.id, Orders.paid.is_(True)))
                         .outerjoin(OrderItem)
                         .outerjoin(Items)
-                        .filter(Users.tg_id == tg_id, or_(Orders.paid.is_(True), Orders.paid.is_(None)))
-                        .group_by(Users.id)
+                        .filter(Users.tg_id == tg_id)
+                        .group_by(Users.id, Users.first_name, Users.last_name)
                     )
 
                     data = stmt_result.fetchone()

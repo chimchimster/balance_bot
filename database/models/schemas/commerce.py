@@ -147,7 +147,7 @@ class OrderItem(Base):
     color = Column(String(15), primary_key=True)
     sex = Column(Enum(Gender, schema='commerce'), primary_key=True)
     qty = Column(Integer, default=1)
-    address_id = Column(ForeignKey('commerce.addresses.id'))
+    address_id = Column(ForeignKey('auth.addresses.id'))
 
 
 class Orders(Base):
