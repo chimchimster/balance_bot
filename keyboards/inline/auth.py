@@ -29,4 +29,15 @@ async def get_registration_keyboard() -> InlineKeyboardMarkup:
     return keyboard
 
 
-__all__ = ['get_registration_keyboard',]
+async def get_restore_password_keyboard() -> InlineKeyboardMarkup:
+
+    restore_password_button = InlineKeyboardButton(text='Восстановить пароль?', callback_data='restore_password')
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [restore_password_button]
+    ])
+
+    return keyboard
+
+
+__all__ = ['get_registration_keyboard', 'get_restore_password_keyboard',]

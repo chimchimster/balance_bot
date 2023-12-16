@@ -31,6 +31,7 @@ class Users(Base):
     tg_id = Column(BigInteger, nullable=False)
     first_name = Column(String(length=50))
     last_name = Column(String(length=50))
+    email = Column(Text, nullable=False)
     date_added = Column(DateTime, default=datetime.utcnow())
     date_changed = Column(DateTime, default=datetime.utcnow())
 
@@ -44,6 +45,7 @@ class Users(Base):
             tg_id: int,
             first_name: str,
             last_name: str,
+            email: str,
             session: AsyncSession,
     ) -> Optional[int]:
 
@@ -53,8 +55,11 @@ class Users(Base):
         if not re.match(r'[А-Яа-яA-Za-z\s]{1,50}', last_name):
             raise IncorrectInput('Имя пользователя должно содержать от 1 до 50 символов.')
 
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            raise IncorrectInput('Неверный формат почты!')
+
         user = await session.execute(
-            insert(cls).values(tg_id=tg_id, first_name=first_name, last_name=last_name).returning(cls.id)
+            insert(cls).values(tg_id=tg_id, first_name=first_name, last_name=last_name, email=email).returning(cls.id)
         )
 
         user_id = user.scalar()

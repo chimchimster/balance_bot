@@ -5,7 +5,8 @@ from aiogram.fsm.context import FSMContext, StorageKey
 from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import Message, CallbackQuery
 
-from keyboards.inline.auth import get_registration_keyboard
+from handlers.auth import authenticate_user, restore_password_handler
+from keyboards.inline.auth import get_registration_keyboard, get_restore_password_keyboard
 from middlewares.utils.state import check_auth_state
 from signals.signals import Signal
 from states.states import InitialState
@@ -35,7 +36,11 @@ class AuthUserMiddleware(BaseMiddleware):
             )
         )
 
-        bot_message = None
+        if isinstance(event, Message):
+            event_type = event
+        else:
+            event_type = event.message
+
         match auth_state:
             case Signal.AUTHENTICATED:
 
@@ -43,15 +48,26 @@ class AuthUserMiddleware(BaseMiddleware):
 
             case Signal.NOT_AUTHENTICATED:
 
-                await state.set_state(InitialState.TO_AUTHENTICATION)
+                if event_type.reply_markup and event_type.reply_markup.inline_keyboard:
+                    inline_button = event_type.reply_markup.inline_keyboard[0][0]
 
-                if isinstance(event, Message) and event.text and event.text.startswith('/'):
-                    bot_message = await event.answer(
-                        f'<code>Привет, {event.from_user.username}!\n\nЧтобы авторизоваться введи пароль:</code>')
+                    if inline_button.callback_data == 'restore_password':
+
+                        return await restore_password_handler(event, state)
+
+                curr_state = await state.get_state()
+
+                if curr_state == InitialState.TO_AUTHENTICATION:
+                    return await authenticate_user(event_type, state)
+                else:
+                    await state.set_state(InitialState.TO_AUTHENTICATION)
+
+                    bot_message = await event_type.answer(
+                        f'<code>Привет, {event.from_user.username}!\n\nЧтобы авторизоваться введи пароль:</code>',
+                        reply_markup=await get_restore_password_keyboard(),
+                    )
                     await state.update_data({'last_bot_msg_id': bot_message.message_id})
                     return bot_message
-                else:
-                    return await handler(event, data)
 
             case Signal.NOT_REGISTERED:
 
@@ -61,7 +77,8 @@ class AuthUserMiddleware(BaseMiddleware):
                     bot_message = await event.answer(
                         f'<code>Привет, {event.from_user.username}\n\nЧтобы начать пользоваться нашим магазином нужно '
                         f'зарегистрироваться.\n\nЭто займет совсем немного времени, начнем?</code>',
-                        reply_markup=await get_registration_keyboard())
+                        reply_markup=await get_registration_keyboard(),
+                    )
                     await state.update_data({'last_bot_msg_id': bot_message.message_id})
                     return bot_message
                 else:

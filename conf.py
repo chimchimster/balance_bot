@@ -10,6 +10,8 @@ class BotSettings(BaseSettings):
     support_username: SecretStr
     smtp_host: SecretStr
     smtp_port: SecretStr
+    email_username: SecretStr
+    email_password: SecretStr
 
     model_config = SettingsConfigDict(
         env_file=pathlib.Path.cwd() / 'balance_bot' / '.env',

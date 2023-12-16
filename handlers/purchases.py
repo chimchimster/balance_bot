@@ -102,10 +102,10 @@ async def apply_filters_handler(query: CallbackQuery, state: FSMContext) -> Mess
                     join(Brands, Items.brand_id == Brands.id).
                     join(ItemMeta, Items.id == ItemMeta.item_id)
                 ).where(
-                    ItemMeta.size.contains([float(size_title)]) if size_title != 'Без фильтра' else text(''),
-                    ItemMeta.color.contains([color_title]) if color_title != 'Без фильтра' else text(''),
-                    ItemMeta.sex == sex_title if sex_title != 'Без фильтра' else text(''),
-                    Brands.title == brand_title if brand_title != 'Без фильтра' else text('')
+                    ItemMeta.size.contains([float(size_title)]) if size_title != 'Без фильтра' else True,
+                    ItemMeta.color.contains([color_title]) if color_title != 'Без фильтра' else True,
+                    ItemMeta.sex == sex_title if sex_title != 'Без фильтра' else True,
+                    Brands.title == brand_title if brand_title != 'Без фильтра' else True
                 )
 
                 result = await session.execute(select_stmt)

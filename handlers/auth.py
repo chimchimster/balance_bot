@@ -11,12 +11,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy import select
 
+from apps.mail.sender import send_email
+from apps.mail.code_gen import generate_code_for_restoring_password
 from database.models import *
 from database.handlers.utils.session import PostgresAsyncSession
 from database.handlers.utils.redis_client import connect_redis_url
 from database.models.exceptions.models_exc import *
 from keyboards.inline.app import main_menu_markup
-from states.states import InitialState, RegState
+from keyboards.inline.auth import get_restore_password_keyboard
+from states.states import InitialState, RegState, RestoreState
 from handlers.utils.auxillary import validate_user_registration, password_matched, delete_prev_messages_and_update_state
 from handlers.app import main_menu_handler
 
@@ -33,7 +36,6 @@ async def cmd_start_handler(message: Message, state: FSMContext) -> Message:
         return await authenticate_user(message, state)
 
     return await main_menu_handler(message, state)
-
 
 @router.callback_query(
     InitialState.TO_REGISTRATION,
@@ -69,11 +71,26 @@ async def input_last_name(message: Message, state: FSMContext) -> Optional[Messa
     return await validate_user_registration(
         message,
         state,
-        RegState.INPUT_PASSWORD,
-        'Придумайте и запишите пароль. Он будет использоваться для входа в магазин.',
+        RegState.INPUT_EMAIL,
+        'Введите актуальную почту (email). Он будет использоваться для восстановления доступа в магазин.',
         'Пожалуйста, введите свою настоящую фамилию.',
         r'[А-Яа-яA-Za-z\s]{1,50}',
         'last_name'
+    )
+
+
+@router.message(
+    RegState.INPUT_EMAIL,
+)
+async def input_email(message: Message, state: FSMContext) -> Optional[Message]:
+    return await validate_user_registration(
+        message,
+        state,
+        RegState.INPUT_PASSWORD,
+        'Придумайте и запишите пароль. Он будет использоваться для входа в магазин.',
+        'Пожалуйста, введите существующую почту.',
+        r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+        'email'
     )
 
 
@@ -122,6 +139,7 @@ async def confirm_registration(message: Message, state: FSMContext) -> Message:
     first_name = data.get('first_name', 'John')
     last_name = data.get('last_name', 'Doe')
     password = data.get('password')
+    email = data.get('email')
     password_confirmation = data.get('password_confirmation')
 
     pwd_matched = await password_matched(password, password_confirmation)
@@ -133,9 +151,14 @@ async def confirm_registration(message: Message, state: FSMContext) -> Message:
     now = int(time.time())
 
     try:
+        await message.chat.delete_message(message_id=message.message_id)
+    except aiogram.exceptions.TelegramBadRequest:
+        pass
+
+    try:
         async with PostgresAsyncSession() as session:
             async with session.begin() as transaction:
-                user_id = await Users.create_user(tg_id, first_name, last_name, session)
+                user_id = await Users.create_user(tg_id, first_name, last_name, email, session)
                 credentials = Credentials(user_id=user_id)
                 await credentials.set_password(password)
                 await credentials.set_auth_hash()
@@ -181,7 +204,10 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
 
     if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', pwd):
 
-        return await message.answer('<code>У вас ошибка, может вы опечатались?</code>')
+        return await message.answer(
+            '<code>У вас ошибка при вводе парооя, может вы опечатались? Попробуйте еще раз!</code>',
+            reply_markup=await get_restore_password_keyboard()
+        )
 
     try:
         async with PostgresAsyncSession() as session:
@@ -200,7 +226,8 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
                     if not pwd_matched:
 
                         return await message.answer(
-                            '<code>Увы, пароли не совпадают. Может вы опечатались?</code>'
+                            '<code>Увы, пароли не совпадают. Может вы опечатались?</code>',
+                            reply_markup=await get_restore_password_keyboard(),
                         )
 
                     await credentials.set_auth_hash()
@@ -223,6 +250,52 @@ async def authenticate_user(message: Message, state: FSMContext) -> Optional[Mes
 @router.callback_query(
     F.data == 'restore_password'
 )
+@delete_prev_messages_and_update_state
 async def restore_password_handler(query: CallbackQuery, state: FSMContext):
 
-    pass
+    tg_id = query.message.chat.id
+
+    async with PostgresAsyncSession() as session:
+        async with session.begin():
+
+            select_stmt = select(Users.email).filter_by(tg_id=tg_id)
+
+            result_stmt = await session.execute(select_stmt)
+
+            email = result_stmt.scalar()
+
+            if email is None:
+                return await query.message.answer('Мы не смогли найти вашу почту. Пожалуйста, обратитесь в поддержку!')
+
+    code = await generate_code_for_restoring_password()
+    await state.update_data({'restore_pwd_code': code})
+    await send_email(
+        [email],
+        'Восстановление пароля (Balance bot)',
+        'Ты видишь это сообщение, потому что кто-то пытается восстановить доступ к твоему аккаунту!',
+        template_name='account/restore_password.html',
+        context=code,
+    )
+
+    await state.set_state(RestoreState.RESTORE_PASSWORD_INIT)
+
+    return await query.message.answer('Мы отправили секретный код на указанную вами при регистрации почту.\n'
+                                      'Введите код из письма:')
+
+
+@router.message(
+    RestoreState.RESTORE_PASSWORD_INIT
+)
+@delete_prev_messages_and_update_state
+async def validate_restore_code_handler(message: Message, state: FSMContext):
+
+    data = await state.get_data()
+
+    restore_pwd_code = data.get('restore_pwd_code')
+    user_wrote = message.text
+
+    if restore_pwd_code != user_wrote:
+        return message.answer('Вы ввели неверный код! Попробуете еще раз?')
+
+    await state.set_state(RestoreState.NEW_PASSWORD)
+    return message.answer('Введите новый пароль:')
