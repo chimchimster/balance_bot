@@ -6,7 +6,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import Message, CallbackQuery
 
 from handlers.auth import authenticate_user, restore_password_handler, validate_restore_code_handler, \
-    restore_password_confirmation_handler
+    set_new_password_handler, confirm_new_password_handler
 from keyboards.inline.auth import get_registration_keyboard, get_restore_password_keyboard
 from middlewares.utils.state import check_auth_state
 from signals.signals import Signal
@@ -61,9 +61,9 @@ class AuthUserMiddleware(BaseMiddleware):
                 if curr_state == RestoreState.RESTORE_PASSWORD_INIT:
                     return await validate_restore_code_handler(event_type, state)
                 elif curr_state == RestoreState.NEW_PASSWORD:
-                    return await restore_password_handler(event_type, state)
+                    return await set_new_password_handler(event_type, state)
                 elif curr_state == RestoreState.NEW_PASSWORD_CONFIRMATION:
-                    return await restore_password_confirmation_handler(event_type, state)
+                    return await confirm_new_password_handler(event_type, state)
                 elif curr_state == InitialState.TO_AUTHENTICATION:
                     return await authenticate_user(event_type, state)
                 else:

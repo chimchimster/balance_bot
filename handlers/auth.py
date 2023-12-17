@@ -310,7 +310,7 @@ async def validate_restore_code_handler(message: Message, state: FSMContext):
     RestoreState.NEW_PASSWORD,
 )
 @delete_prev_messages_and_update_state
-async def restore_password_handler(message: Message, state: FSMContext):
+async def set_new_password_handler(message: Message, state: FSMContext):
 
     user_wrote = message.text
 
@@ -327,7 +327,7 @@ async def restore_password_handler(message: Message, state: FSMContext):
     RegState.INPUT_PASSWORD_CONFIRMATION,
 )
 @delete_prev_messages_and_update_state
-async def restore_password_confirmation_handler(message: Message, state: FSMContext):
+async def confirm_new_password_handler(message: Message, state: FSMContext):
 
     user_wrote = message.text
     tg_id = message.from_user.id
@@ -345,8 +345,8 @@ async def restore_password_confirmation_handler(message: Message, state: FSMCont
                     session.add(credentials)
                     await session.commit()
                     await state.set_state(InitialState.TO_AUTHENTICATION)
-        except sqlalchemy.exc.SQLAlchemyError:
-            await transaction.rollback()
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            print(e)
             return await message.answer('Упс, что-то пошло не так...')
 
     return await message.answer('Увы, введенные пароли не совпадают. Попробуете еще раз?')
