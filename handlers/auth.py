@@ -284,7 +284,7 @@ async def restore_password_handler(query: CallbackQuery, state: FSMContext):
 
 
 @router.message(
-    RestoreState.RESTORE_PASSWORD_INIT
+    RestoreState.RESTORE_PASSWORD_INIT,
 )
 @delete_prev_messages_and_update_state
 async def validate_restore_code_handler(message: Message, state: FSMContext):
@@ -294,8 +294,59 @@ async def validate_restore_code_handler(message: Message, state: FSMContext):
     restore_pwd_code = data.get('restore_pwd_code')
     user_wrote = message.text
 
+    try:
+        await message.chat.delete_message(message_id=message.message_id)
+    except aiogram.exceptions.TelegramBadRequest:
+        pass
+
     if restore_pwd_code != user_wrote:
-        return message.answer('Вы ввели неверный код! Попробуете еще раз?')
+        return await message.answer('Вы ввели неверный код! Попробуете еще раз?')
 
     await state.set_state(RestoreState.NEW_PASSWORD)
-    return message.answer('Введите новый пароль:')
+    return await message.answer('Введите новый пароль:')
+
+
+@router.message(
+    RestoreState.NEW_PASSWORD,
+)
+@delete_prev_messages_and_update_state
+async def restore_password_handler(message: Message, state: FSMContext):
+
+    user_wrote = message.text
+
+    if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', user_wrote):
+        return await message.answer('Допускается пароль длинною от 8 до 16 символов. Пароль может содержать латинские '
+                                 'буквы в верхнем и нижнем регистре, цифры, а также специальные символы.')
+
+    await state.update_data({'restore_pwd': user_wrote})
+    await state.set_state(RestoreState.NEW_PASSWORD_CONFIRMATION)
+    return await message.answer('Повторите введенный вами ранее пароль:')
+
+
+@router.message(
+    RegState.INPUT_PASSWORD_CONFIRMATION,
+)
+@delete_prev_messages_and_update_state
+async def restore_password_confirmation_handler(message: Message, state: FSMContext):
+
+    user_wrote = message.text
+    tg_id = message.from_user.id
+
+    data = await state.get_data()
+
+    if data and data.get('restore_pwd') == user_wrote:
+        try:
+            async with PostgresAsyncSession() as session:
+                async with session.begin() as transaction:
+                    user_id = Users.get_user_id(tg_id=tg_id, session=session)
+                    credentials = Credentials(user_id=user_id)
+                    await credentials.set_password(password=user_wrote)
+                    await credentials.set_auth_hash()
+                    session.add(credentials)
+                    await session.commit()
+                    await state.set_state(InitialState.TO_AUTHENTICATION)
+        except sqlalchemy.exc.SQLAlchemyError:
+            await transaction.rollback()
+            return await message.answer('Упс, что-то пошло не так...')
+
+    return await message.answer('Увы, введенные пароли не совпадают. Попробуете еще раз?')
