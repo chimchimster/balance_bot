@@ -8,16 +8,16 @@ async def main_menu_markup() -> InlineKeyboardMarkup:
 
     personal_button = InlineKeyboardButton(text='В личный кабинет', callback_data='personal_account')
     purchase_button = InlineKeyboardButton(text='К покупкам', callback_data='purchases')
-    show_cart = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
+    show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
     support_button = InlineKeyboardButton(
         text='Обратиться в поддержку',
         url=f'https://t.me/{bot_settings.support_username.get_secret_value()}'
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [personal_button],
         [purchase_button],
-        [show_cart],
+        [show_cart_button],
+        [personal_button],
         [support_button],
     ])
 
@@ -26,9 +26,9 @@ async def main_menu_markup() -> InlineKeyboardMarkup:
 
 async def personal_account_markup() -> InlineKeyboardMarkup:
 
-    orders_button = InlineKeyboardButton(text='Мои заказы', callback_data='orders')
+    purchase_history_button = InlineKeyboardButton(text='История покупок', callback_data='orders')
     show_addresses = InlineKeyboardButton(text='Мои адреса', callback_data='show_addresses')
-    add_address = InlineKeyboardButton(text='Добавить адрес доставки', callback_data='add_address')
+    # add_address = InlineKeyboardButton(text='Добавить адрес доставки', callback_data='add_address')
 
     show_cart_button = InlineKeyboardButton(text='Моя корзина', callback_data='show_cart')
     back_to_main_menu_button = InlineKeyboardButton(text='Вернуться в главное меню', callback_data='back_to_main_menu')
@@ -38,9 +38,9 @@ async def personal_account_markup() -> InlineKeyboardMarkup:
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [orders_button],
+        [purchase_history_button],
         [show_addresses],
-        [add_address],
+        # [add_address],
         [show_cart_button],
         [support_button],
         [back_to_main_menu_button],

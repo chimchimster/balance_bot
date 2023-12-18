@@ -31,6 +31,7 @@ router = Router()
 )
 @delete_prev_messages_and_update_state
 async def personal_account_handler(query: CallbackQuery, state: FSMContext):
+
     tg_id = query.message.chat.id
 
     try:

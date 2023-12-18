@@ -174,7 +174,10 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
         )
 
     except sqlalchemy.exc.SQLAlchemyError:
-        return await balance_bot.send_message(text='<code>Упс, что-то пошло не так...</code>', reply_markup=await main_menu_markup())
+        return await balance_bot.send_message(
+            text='<code>Упс, что-то пошло не так...</code>',
+            reply_markup=await main_menu_markup(),
+        )
 
     return await balance_bot.answer_shipping_query(
         shipping_query.id,
@@ -186,6 +189,7 @@ async def shipping_handler(shipping_query: ShippingQuery, state: FSMContext):
 
 @router.pre_checkout_query()
 async def checkout_handler(pre_checkout_query: PreCheckoutQuery):
+
     return await balance_bot.answer_pre_checkout_query(
         pre_checkout_query.id,
         ok=True,
