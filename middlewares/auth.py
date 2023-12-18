@@ -3,10 +3,10 @@ from typing import Callable, Awaitable, Dict, Any, Union
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext, StorageKey
 from aiogram.fsm.storage.redis import RedisStorage
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
-from handlers.auth import authenticate_user, restore_password_handler, validate_restore_code_handler, \
-    set_new_password_handler, confirm_new_password_handler, refuse_restore_operations_handler
+from conf import bot_settings
+from handlers.auth import *
 from keyboards.inline.auth import get_registration_keyboard, get_restore_password_keyboard
 from middlewares.utils.state import check_auth_state
 from signals.signals import Signal
@@ -73,25 +73,24 @@ class AuthUserMiddleware(BaseMiddleware):
                 elif curr_state == InitialState.TO_AUTHENTICATION:
                     return await authenticate_user(event_type, state)
                 else:
-                    await state.set_state(InitialState.TO_AUTHENTICATION)
-
-                    bot_message = await event_type.answer(
-                        f'<code>Привет, {event.from_user.username}!\n\nЧтобы авторизоваться введи пароль:</code>',
-                        reply_markup=await get_restore_password_keyboard(),
-                    )
-                    await state.update_data({'last_bot_msg_id': bot_message.message_id})
-                    return bot_message
+                    if isinstance(event, Message) and event.text and event.text.startswith('/'):
+                        await state.set_state(InitialState.TO_AUTHENTICATION)
+                        html = await render_template('auth/welcome_auth.html')
+                        bot_message = await event_type.answer(
+                            text=html,
+                            reply_markup=await get_restore_password_keyboard(),
+                        )
+                        await state.update_data({'last_bot_msg_id': bot_message.message_id})
+                        return bot_message
+                    else:
+                        return await handler(event, data)
 
             case Signal.NOT_REGISTERED:
 
                 await state.set_state(InitialState.TO_REGISTRATION)
 
                 if isinstance(event, Message) and event.text and event.text.startswith('/'):
-
-                    html = await render_template(
-                        template_name='auth/welcome_reg.html',
-                        username=event.from_user.username,
-                    )
+                    html = await render_template(template_name='auth/welcome_reg.html')
                     bot_message = await event.answer(
                         text=html,
                         reply_markup=await get_registration_keyboard(),
@@ -100,10 +99,17 @@ class AuthUserMiddleware(BaseMiddleware):
                     return bot_message
                 else:
                     return await handler(event, data)
-
             case _:
-                # 500 server error
-                bot_message = await event.answer('<code>Возникла ошибка 500!</code>')
+                html = await render_template(template_name='errors/common.html')
+                bot_message = await event.answer(
+                    text=html,
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(
+                            text='Обратиться в поддержку',
+                            url=f'https://t.me/{bot_settings.support_username.get_secret_value()}'
+                        )]
+                    ])
+                )
 
                 return bot_message
 

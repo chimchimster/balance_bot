@@ -18,10 +18,11 @@ from database.handlers.utils.session import PostgresAsyncSession
 from database.handlers.utils.redis_client import connect_redis_url
 from database.models.exceptions.models_exc import *
 from keyboards.inline.app import main_menu_markup
-from keyboards.inline.auth import get_restore_password_keyboard, refuse_restore_password_keyboard
+from keyboards.inline.auth import get_restore_password_keyboard, refuse_operations_keyboard, get_registration_keyboard
 from states.states import InitialState, RegState, RestoreState
 from handlers.utils.auxillary import validate_user_registration, password_matched, delete_prev_messages_and_update_state
 from handlers.app import main_menu_handler
+from utils.jinja_template import render_template
 
 router = Router()
 
@@ -44,11 +45,18 @@ async def cmd_start_handler(message: Message, state: FSMContext) -> Message:
 @delete_prev_messages_and_update_state
 async def refuse_restore_operations_handler(query: CallbackQuery, state: FSMContext):
 
-    await state.clear()
+    curr_state = await state.get_state()
+
+    if curr_state == InitialState.TO_REGISTRATION:
+        html = await render_template('auth/welcome_reg.html')
+        keyboard = await get_registration_keyboard()
+    else:
+        html = await render_template('auth/welcome_auth.html')
+        keyboard = await get_restore_password_keyboard()
 
     return await query.message.answer(
-        f'<code>Привет, {query.from_user.username}!\n\nЧтобы авторизоваться введи пароль:</code>',
-        reply_markup=await get_restore_password_keyboard(),
+        text=html,
+        reply_markup=keyboard,
     )
 
 
@@ -61,7 +69,15 @@ async def register_user_handler(query: CallbackQuery, state: FSMContext):
 
     await state.set_state(RegState.INPUT_FIRST_NAME)
 
-    return await query.message.answer('<code>Введите имя:</code>')
+    html = await render_template(
+        'auth/reg_detail.html',
+        username=query.from_user.username.capitalize(),
+        msg='Введите ваше имя:',
+    )
+    return await query.message.answer(
+        text=html,
+        reply_markup=await refuse_operations_keyboard(),
+    )
 
 
 @router.message(
@@ -76,6 +92,7 @@ async def input_first_name(message: Message, state: FSMContext) -> Optional[Mess
         'Пожалуйста, введите свое настоящее имя.',
         r'[А-Яа-яA-Za-z\s]{1,50}',
         'first_name',
+        'auth/reg_detail.html',
     )
 
 
@@ -87,10 +104,12 @@ async def input_last_name(message: Message, state: FSMContext) -> Optional[Messa
         message,
         state,
         RegState.INPUT_EMAIL,
-        'Введите актуальную почту (email). Он будет использоваться для восстановления доступа в магазин.',
+        'Введите адрес электронной почты (email).\n\n'
+        'Вы всегда сможете восстановить доступ к аккаунту с помощью почты.',
         'Пожалуйста, введите свою настоящую фамилию.',
         r'[А-Яа-яA-Za-z\s]{1,50}',
-        'last_name'
+        'last_name',
+        'auth/reg_detail.html',
     )
 
 
@@ -102,10 +121,11 @@ async def input_email(message: Message, state: FSMContext) -> Optional[Message]:
         message,
         state,
         RegState.INPUT_PASSWORD,
-        'Придумайте и запишите пароль. Он будет использоваться для входа в магазин.',
+        'Придумайте и запишите пароль.\n\nОн будет использоваться для входа в магазин.',
         'Пожалуйста, введите существующую почту.',
         r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-        'email'
+        'email',
+        'auth/reg_detail.html',
     )
 
 
@@ -117,11 +137,12 @@ async def input_password(message: Message, state: FSMContext) -> Optional[Messag
         message,
         state,
         RegState.INPUT_PASSWORD_CONFIRMATION,
-        'Повторите пароль',
+        'Пожалуйста, подтвердите ввод пароля, повторив его еще раз.',
         'Допускается пароль длинною от 8 до 16 символов. Пароль может содержать латинские буквы в верхнем и '
         'нижнем регистре, цифры, а также специальные символы.',
         r'[\w!@#$&\(\)\\-]{8,16}',
-        'password'
+        'password',
+        'auth/reg_detail.html',
     )
 
 
@@ -138,6 +159,7 @@ async def input_password_confirmation(message: Message, state: FSMContext) -> Op
         'нижнем регистре, цифры, а также специальные символы.',
         r'[\w!@#$&\(\)\\-]{8,16}',
         'password_confirmation',
+        'auth/reg_detail.html',
         end=True,
     )
 
@@ -298,7 +320,7 @@ async def restore_password_handler(query: CallbackQuery, state: FSMContext):
     await state.set_state(RestoreState.RESTORE_PASSWORD_INIT)
 
     return await query.message.answer('Мы отправили секретный код на указанную вами при регистрации почту.\n'
-                                      'Введите код из письма:', reply_markup=await refuse_restore_password_keyboard())
+                                      'Введите код из письма:', reply_markup=await refuse_operations_keyboard())
 
 
 @router.message(
@@ -388,3 +410,13 @@ async def confirm_new_password_handler(message: Message, state: FSMContext):
         'Увы, введенные пароли не совпадают. Попробуете еще раз?',
         reply_markup=await get_restore_password_keyboard(),
     )
+
+
+__all__ = [
+    'authenticate_user',
+    'restore_password_handler',
+    'validate_restore_code_handler',
+    'set_new_password_handler',
+    'confirm_new_password_handler',
+    'refuse_restore_operations_handler',
+]

@@ -15,7 +15,8 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, Callback
 from sqlalchemy import select
 
 from database.session import AsyncSessionLocal
-from keyboards.inline.app import bought_items_markup
+from keyboards.inline.app import bought_items_markup, main_menu_markup
+from keyboards.inline.auth import refuse_operations_keyboard
 from keyboards.inline.purchases import get_search_filter_keyboard
 from utils.jinja_template import render_template
 from utils.paginator import PaginatorStorage
@@ -31,10 +32,13 @@ async def validate_user_registration(
         err_msg: str,
         regex_pattern: str,
         key_name: str,
+        template_name: str,
         end: bool = False,
 ) -> None:
 
     data = await state.get_data()
+
+    username = message.from_user.username.capitalize()
 
     last_bot_msg_id = data.get('last_bot_msg_id')
 
@@ -44,8 +48,11 @@ async def validate_user_registration(
     msg_txt = message.text
 
     if not re.match(regex_pattern, msg_txt):
-
-        last_bot_msg = await message.answer(f'<code>{err_msg}</code>')
+        html = await render_template(template_name, msg=err_msg, username=username)
+        last_bot_msg = await message.answer(
+            html,
+            reply_markup=await refuse_operations_keyboard(),
+        )
 
         await state.update_data({'last_bot_msg_id': last_bot_msg.message_id})
 
@@ -55,16 +62,32 @@ async def validate_user_registration(
     await state.set_state(state_to_set)
     await message.chat.delete_message(message_id=message.message_id)
 
+    html = await render_template(
+        template_name,
+        msg=info_msg,
+        username=username,
+    )
     if not end:
-        last_bot_msg = await message.answer(f'<code>{info_msg}</code>')
+        last_bot_msg = await message.answer(
+            text=html,
+            reply_markup=await refuse_operations_keyboard(),
+        )
     else:
         button_yes = KeyboardButton(text='Да')
         button_no = KeyboardButton(text='Нет')
 
         keyboard = ReplyKeyboardMarkup(
-            keyboard=[[button_yes], [button_no]], resize_keyboard=True)
+            keyboard=[
+                [button_yes],
+                [button_no],
+            ],
+            resize_keyboard=True,
+        )
 
-        last_bot_msg = await message.answer(f'<code>{info_msg}</code>', reply_markup=keyboard)
+        last_bot_msg = await message.answer(
+            text=html,
+            reply_markup=keyboard,
+        )
 
     await state.update_data({'last_bot_msg_id': last_bot_msg.message_id})
 
@@ -102,7 +125,12 @@ async def filter_products(
                     await state.update_data(
                         {filter_name: ':'.join([','.join(tuple(map(str, obj))) for obj in objects + [('0', 'Без фильтра')]])})
         except sqlalchemy.exc.SQLAlchemyError:
-            bot_message = await query.message.answer('<code>Упс, что-то пошло не так...</code>')
+
+            html = await render_template('errors/common.html')
+            bot_message = await query.message.answer(
+                text=html,
+                reply_markup=await main_menu_markup(),
+            )
             await state.update_data({'last_bot_msg_id': bot_message.message_id})
             return bot_message
     else:

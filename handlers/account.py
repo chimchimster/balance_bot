@@ -14,6 +14,7 @@ from database.models import *
 from keyboards.inline.app import personal_account_markup, bought_items_markup, back_to_account_markup, main_menu_markup
 from callback_data.callback_data import PersonalOrdersCallbackData
 from database.models.exceptions.models_exc import UserNotFound
+from keyboards.inline.auth import get_registration_keyboard
 from states.states import SetNewAddressState
 from database.session import AsyncSessionLocal
 from handlers.utils.named_entities import Item, AddressItem
@@ -60,7 +61,12 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                         raise UserNotFound
                     await state.update_data({'user_id': user_id, 'first_name': first_name, 'last_name': last_name})
                 except UserNotFound:
-                    return await query.message.answer('<code>Пользователь не найден</code>')
+
+                    html = await render_template('auth/welcome_reg.html')
+                    return await query.message.answer(
+                        text=html,
+                        reply_markup=await get_registration_keyboard(),
+                    )
                 else:
                     html = await render_template(
                         'account/personal_account.html',
@@ -69,13 +75,16 @@ async def personal_account_handler(query: CallbackQuery, state: FSMContext):
                         orders_count=total_orders_count,
                         orders_sum=total_orders_price,
                     )
-
-                    return await query.message.answer(text=html, reply_markup=await personal_account_markup())
+                    return await query.message.answer(
+                        text=html,
+                        reply_markup=await personal_account_markup(),
+                    )
 
     except sqlalchemy.exc.SQLAlchemyError:
+        html = await render_template(template_name='errors/common.html')
         return await query.message.answer(
-            '<code>Упс, что-то пошло не так...</code>',
-            reply_markup=await main_menu_markup()
+            text=html,
+            reply_markup=await main_menu_markup(),
         )
 
 
@@ -90,7 +99,11 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
     user_id = data.get('user_id')
 
     if user_id is None:
-        return await query.message.answer('<code>Упс, что-то пошло не так...</code>')
+        html = await render_template(template_name='errors/common.html')
+        return await query.message.answer(
+            text=html,
+            reply_markup=await main_menu_markup(),
+        )
     try:
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -123,12 +136,15 @@ async def all_orders_handler(query: CallbackQuery, state: FSMContext):
                     return await paginate_over_bought_items(query, state)
                 else:
                     return await query.message.answer(
-                        text='<code>У вас пока что нет покупок в нашем магазине.</code>',
+                        text='У вас пока что нет покупок в нашем магазине.',
                         reply_markup=await personal_account_markup()
                     )
     except sqlalchemy.exc.SQLAlchemyError:
-        return await query.message.answer('<code>Упс, что-то пошло не так...</code>',
-                                          reply_markup=await main_menu_markup())
+        html = await render_template(template_name='errors/common.html')
+        return await query.message.answer(
+            text=html,
+            reply_markup=await main_menu_markup(),
+        )
 
 
 @router.callback_query(
