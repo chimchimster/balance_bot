@@ -6,7 +6,7 @@ from conf import bot_settings
 async def get_registration_keyboard() -> InlineKeyboardMarkup:
 
     register_button = InlineKeyboardButton(
-        text='Да, начинем!',
+        text='Продолжить регистрацию!',
         callback_data='to_registration'
     )
 
@@ -35,6 +35,17 @@ async def get_restore_password_keyboard() -> InlineKeyboardMarkup:
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [restore_password_button]
+    ])
+
+    return keyboard
+
+
+async def refuse_restore_password_keyboard() -> InlineKeyboardMarkup:
+
+    refuse_button = InlineKeyboardButton(text='В другой раз...', callback_data='refuse_operations')
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [refuse_button],
     ])
 
     return keyboard

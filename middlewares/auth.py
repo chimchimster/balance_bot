@@ -6,11 +6,12 @@ from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import Message, CallbackQuery
 
 from handlers.auth import authenticate_user, restore_password_handler, validate_restore_code_handler, \
-    set_new_password_handler, confirm_new_password_handler
+    set_new_password_handler, confirm_new_password_handler, refuse_restore_operations_handler
 from keyboards.inline.auth import get_registration_keyboard, get_restore_password_keyboard
 from middlewares.utils.state import check_auth_state
 from signals.signals import Signal
 from states.states import InitialState, RestoreState
+from utils.jinja_template import render_template
 
 
 class AuthUserMiddleware(BaseMiddleware):
@@ -27,7 +28,7 @@ class AuthUserMiddleware(BaseMiddleware):
     ):
 
         auth_state = await check_auth_state(event)
-        print(auth_state)
+
         state = FSMContext(
             storage=self._storage,
             key=StorageKey(
@@ -36,6 +37,7 @@ class AuthUserMiddleware(BaseMiddleware):
                 user_id=event.from_user.id if isinstance(event, Message) else event.from_user.id
             )
         )
+        print(auth_state, await state.get_state())
 
         if isinstance(event, Message):
             event_type = event
@@ -55,6 +57,10 @@ class AuthUserMiddleware(BaseMiddleware):
                     if inline_button.callback_data == 'restore_password':
 
                         return await restore_password_handler(event, state)
+
+                    if inline_button.callback_data == 'refuse_operations':
+
+                        return await refuse_restore_operations_handler(event, state)
 
                 curr_state = await state.get_state()
 
@@ -81,9 +87,13 @@ class AuthUserMiddleware(BaseMiddleware):
                 await state.set_state(InitialState.TO_REGISTRATION)
 
                 if isinstance(event, Message) and event.text and event.text.startswith('/'):
+
+                    html = await render_template(
+                        template_name='auth/welcome_reg.html',
+                        username=event.from_user.username,
+                    )
                     bot_message = await event.answer(
-                        f'<code>Привет, {event.from_user.username}\n\nЧтобы начать пользоваться нашим магазином нужно '
-                        f'зарегистрироваться.\n\nЭто займет совсем немного времени, начнем?</code>',
+                        text=html,
                         reply_markup=await get_registration_keyboard(),
                     )
                     await state.update_data({'last_bot_msg_id': bot_message.message_id})
@@ -93,7 +103,7 @@ class AuthUserMiddleware(BaseMiddleware):
 
             case _:
                 # 500 server error
-                bot_message = await event.answer('<code>Возникла ошибка 404!</code>')
+                bot_message = await event.answer('<code>Возникла ошибка 500!</code>')
 
                 return bot_message
 

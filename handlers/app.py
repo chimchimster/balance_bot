@@ -18,7 +18,11 @@ async def send_main_manu(obj: Union[Message, CallbackQuery], state: FSMContext):
 
     old_data = await state.get_data()
 
-    await state.set_data({key: value for key, value in old_data.items() if key in ('in_cart', 'current_address', 'current_address_id')})
+    await state.set_data({key: value for key, value in old_data.items() if key in (
+        'in_cart',
+        'current_address',
+        'current_address_id',
+    )})
 
     html = await render_template('menu/main_menu.html')
 

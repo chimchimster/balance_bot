@@ -18,7 +18,7 @@ from database.handlers.utils.session import PostgresAsyncSession
 from database.handlers.utils.redis_client import connect_redis_url
 from database.models.exceptions.models_exc import *
 from keyboards.inline.app import main_menu_markup
-from keyboards.inline.auth import get_restore_password_keyboard
+from keyboards.inline.auth import get_restore_password_keyboard, refuse_restore_password_keyboard
 from states.states import InitialState, RegState, RestoreState
 from handlers.utils.auxillary import validate_user_registration, password_matched, delete_prev_messages_and_update_state
 from handlers.app import main_menu_handler
@@ -36,6 +36,21 @@ async def cmd_start_handler(message: Message, state: FSMContext) -> Message:
         return await authenticate_user(message, state)
 
     return await main_menu_handler(message, state)
+
+
+@router.callback_query(
+    F.data == 'refuse_operations',
+)
+@delete_prev_messages_and_update_state
+async def refuse_restore_operations_handler(query: CallbackQuery, state: FSMContext):
+
+    await state.clear()
+
+    return await query.message.answer(
+        f'<code>Привет, {query.from_user.username}!\n\nЧтобы авторизоваться введи пароль:</code>',
+        reply_markup=await get_restore_password_keyboard(),
+    )
+
 
 @router.callback_query(
     InitialState.TO_REGISTRATION,
@@ -265,7 +280,10 @@ async def restore_password_handler(query: CallbackQuery, state: FSMContext):
             email = result_stmt.scalar()
 
             if email is None:
-                return await query.message.answer('Мы не смогли найти вашу почту. Пожалуйста, обратитесь в поддержку!')
+                return await query.message.answer(
+                    'Мы не смогли найти вашу почту. Пожалуйста, обратитесь в поддержку!',
+                    reply_markup=await get_restore_password_keyboard(),
+                )
 
     code = await generate_code_for_restoring_password()
     await state.update_data({'restore_pwd_code': code})
@@ -280,7 +298,7 @@ async def restore_password_handler(query: CallbackQuery, state: FSMContext):
     await state.set_state(RestoreState.RESTORE_PASSWORD_INIT)
 
     return await query.message.answer('Мы отправили секретный код на указанную вами при регистрации почту.\n'
-                                      'Введите код из письма:')
+                                      'Введите код из письма:', reply_markup=await refuse_restore_password_keyboard())
 
 
 @router.message(
@@ -300,7 +318,10 @@ async def validate_restore_code_handler(message: Message, state: FSMContext):
         pass
 
     if restore_pwd_code != user_wrote:
-        return await message.answer('Вы ввели неверный код! Попробуете еще раз?')
+        return await message.answer(
+            'Вы ввели неверный код! Попробуете еще раз?',
+            reply_markup=await get_restore_password_keyboard(),
+        )
 
     await state.set_state(RestoreState.NEW_PASSWORD)
     return await message.answer('Введите новый пароль:')
@@ -316,11 +337,16 @@ async def set_new_password_handler(message: Message, state: FSMContext):
 
     if not re.match(r'[\w!@#$&\(\)\\-]{8,16}', user_wrote):
         return await message.answer('Допускается пароль длинною от 8 до 16 символов. Пароль может содержать латинские '
-                                 'буквы в верхнем и нижнем регистре, цифры, а также специальные символы.')
+                                 'буквы в верхнем и нижнем регистре, цифры, а также специальные символы.',
+                                    reply_markup=await get_restore_password_keyboard()
+                                    )
 
     await state.update_data({'restore_pwd': user_wrote})
     await state.set_state(RestoreState.NEW_PASSWORD_CONFIRMATION)
-    return await message.answer('Повторите введенный вами ранее пароль:')
+    return await message.answer(
+        'Повторите введенный вами ранее пароль:',
+        reply_markup=await get_restore_password_keyboard(),
+    )
 
 
 @router.message(
@@ -337,16 +363,28 @@ async def confirm_new_password_handler(message: Message, state: FSMContext):
     if data and data.get('restore_pwd') == user_wrote:
         try:
             async with PostgresAsyncSession() as session:
-                async with session.begin() as transaction:
-                    user_id = Users.get_user_id(tg_id=tg_id, session=session)
-                    credentials = Credentials(user_id=user_id)
-                    await credentials.set_password(password=user_wrote)
-                    await credentials.set_auth_hash()
-                    session.add(credentials)
-                    await session.commit()
-                    await state.set_state(InitialState.TO_AUTHENTICATION)
-        except sqlalchemy.exc.SQLAlchemyError as e:
-            print(e)
-            return await message.answer('Упс, что-то пошло не так...')
+                async with session.begin():
+                    user_id = await Users.get_user_id(tg_id=tg_id, session=session)
 
-    return await message.answer('Увы, введенные пароли не совпадают. Попробуете еще раз?')
+                    credentials = await session.execute(
+                        select(Credentials).filter_by(user_id=user_id)
+                    )
+
+                    credentials = credentials.scalar()
+                    if credentials:
+                        await credentials.set_password(password=user_wrote)
+                        await credentials.set_auth_hash()
+                        await session.commit()
+
+                    await state.set_state(InitialState.TO_AUTHENTICATION)
+                    return await message.answer('Пароль успешно обновлен!', reply_markup=await main_menu_markup())
+        except sqlalchemy.exc.SQLAlchemyError:
+            return await message.answer(
+                'Упс, что-то пошло не так...',
+                reply_markup=await get_restore_password_keyboard(),
+            )
+
+    return await message.answer(
+        'Увы, введенные пароли не совпадают. Попробуете еще раз?',
+        reply_markup=await get_restore_password_keyboard(),
+    )

@@ -267,13 +267,6 @@ class Credentials(Base):
 
         return self.password_hash == hash_hex
 
-    async def update_password(
-            self,
-            password: str,
-
-    ):
-        pass
-
     async def set_auth_hash(self):
 
         user_data = secrets.token_hex(16)
